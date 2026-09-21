@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+  <title>QR Check-in</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+
+<body>
+
+<h2>QR Check-in</h2>
+
+<div id="reader" style="width:100%; max-width:500px;"></div>
+
+<h3 id="result">Waiting for scan...</h3>
+
+<script>
+
+function onScanSuccess(decodedText) {
+
+  document.getElementById("result").innerHTML =
+    "Scanned ID: " + decodedText;
+}
+
+const scanner = new Html5QrcodeScanner(
+  "reader",
+  {
+    fps: 10,
+    qrbox: {
+      width: 250,
+      height: 250
+    }
+  },
+  false
+);
+
+scanner.render(onScanSuccess);
+
+</script>
+
+</body>
+</html>
