@@ -2,18 +2,14 @@
 <html lang="ko">
 
 <head>
-
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0">
-
-  <title>입장 확인</title>
+  <title>QR 입장 확인</title>
 
   <script src="https://unpkg.com/html5-qrcode"></script>
 
   <style>
-
     * {
       box-sizing: border-box;
     }
@@ -32,8 +28,7 @@
     }
 
     h2 {
-      margin-top: 10px;
-      margin-bottom: 20px;
+      margin: 10px 0 20px;
       color: #333;
     }
 
@@ -60,7 +55,7 @@
       background: white;
       border-radius: 12px;
       text-align: left;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
 
     .name {
@@ -136,9 +131,7 @@
       opacity: 0.5;
       cursor: default;
     }
-
   </style>
-
 </head>
 
 
@@ -157,81 +150,48 @@
 
   <div id="personCard">
 
-    <div id="personName"
-         class="name">
+    <div id="personName" class="name"></div>
+
+
+    <div class="row">
+      <div class="label">이메일</div>
+      <div id="personEmail" class="value"></div>
     </div>
 
 
     <div class="row">
-
-      <div class="label">
-        이메일
-      </div>
-
-      <div id="personEmail"
-           class="value">
-      </div>
-
+      <div class="label">전화번호</div>
+      <div id="personPhone" class="value"></div>
     </div>
 
 
     <div class="row">
-
-      <div class="label">
-        전화번호
-      </div>
-
-      <div id="personPhone"
-           class="value">
-      </div>
-
+      <div class="label">성별</div>
+      <div id="personGender" class="value"></div>
     </div>
 
 
     <div class="row">
-
-      <div class="label">
-        성별
-      </div>
-
-      <div id="personGender"
-           class="value">
-      </div>
-
+      <div class="label">연령대</div>
+      <div id="personAge" class="value"></div>
     </div>
 
 
-    <div class="row">
-
-      <div class="label">
-        연령대
-      </div>
-
-      <div id="personAge"
-           class="value">
-      </div>
-
-    </div>
+    <div id="checkInStatus"></div>
 
 
-    <div id="checkInStatus">
-    </div>
-
-
-    <button id="checkInButton"
-            onclick="confirmCheckIn()"
-            style="display:none;">
-
+    <button
+      id="checkInButton"
+      onclick="confirmCheckIn()"
+      style="display:none;">
       입장확인
-
     </button>
 
 
-    <button id="scanAgainButton"
-            onclick="restartScanner()">
-
+    <button
+      id="scanAgainButton"
+      onclick="restartScanner()">
       다음 사람 스캔
-
     </button>
 
   </div>
@@ -242,7 +202,7 @@
 <script>
 
 /* =====================================================
-   APPS SCRIPT WEB APP URL
+   GOOGLE APPS SCRIPT WEB APP
 ===================================================== */
 
 const API_URL =
@@ -261,29 +221,24 @@ let processing = false;
 
 let requestCounter = 0;
 
-
 const html5QrCode =
   new Html5Qrcode("reader");
 
 
 /* =====================================================
-   START QR SCANNER
+   START SCANNER
 ===================================================== */
 
 function startScanner() {
 
   processing = false;
-
   currentQRCode = "";
-
 
   document.getElementById("personCard")
     .style.display = "none";
 
-
   document.getElementById("status")
     .style.display = "block";
-
 
   document.getElementById("status")
     .innerHTML =
@@ -294,10 +249,7 @@ function startScanner() {
 
     fps: 15,
 
-    qrbox: function(
-      viewfinderWidth,
-      viewfinderHeight
-    ) {
+    qrbox: function(viewfinderWidth, viewfinderHeight) {
 
       const size =
         Math.floor(
@@ -311,25 +263,21 @@ function startScanner() {
         width: size,
         height: size
       };
-
     }
-
   };
 
 
   html5QrCode.start(
 
-    {
-      facingMode: "environment"
-    },
+    { facingMode: "environment" },
 
     config,
 
     onScanSuccess,
 
     function() {
-      // QR Code를 찾는 동안 발생하는
-      // 반복적인 메시지는 무시합니다.
+      // QR을 찾는 동안 발생하는
+      // 반복적인 scan error는 무시
     }
 
   )
@@ -355,7 +303,7 @@ function startScanner() {
 
 
 /* =====================================================
-   QR SUCCESSFULLY SCANNED
+   QR DETECTED
 ===================================================== */
 
 function onScanSuccess(decodedText) {
@@ -364,9 +312,7 @@ function onScanSuccess(decodedText) {
     return;
   }
 
-
   processing = true;
-
 
   currentQRCode =
     String(decodedText).trim();
@@ -377,19 +323,13 @@ function onScanSuccess(decodedText) {
       "QR Code 확인 중...";
 
 
-  /*
-     QR을 읽으면 카메라를 정지시킵니다.
-  */
-
   html5QrCode.stop()
 
     .then(function() {
 
       scannerRunning = false;
 
-      lookupPerson(
-        currentQRCode
-      );
+      lookupPerson(currentQRCode);
 
     })
 
@@ -397,9 +337,7 @@ function onScanSuccess(decodedText) {
 
       scannerRunning = false;
 
-      lookupPerson(
-        currentQRCode
-      );
+      lookupPerson(currentQRCode);
 
     });
 
@@ -407,10 +345,10 @@ function onScanSuccess(decodedText) {
 
 
 /* =====================================================
-   LOOKUP PERSON
+   LOOKUP
 
-   중요:
-   여기서는 입장시각을 기록하지 않습니다.
+   스캔 단계에서는 정보를 조회하기만 합니다.
+   L열의 입장시각은 변경하지 않습니다.
 ===================================================== */
 
 function lookupPerson(qrCode) {
@@ -421,32 +359,24 @@ function lookupPerson(qrCode) {
 
 
   callApi(
-
     "lookup",
-
     qrCode,
 
     function(data) {
 
-      if (
-        !data ||
-        data.success !== true
-      ) {
+      if (!data || data.success !== true) {
 
         showError(
           data && data.message
-            ? data.message
+            ? escapeHtml(data.message)
             : "등록정보를 확인할 수 없습니다."
         );
 
         return;
-
       }
 
 
-      if (
-        data.found !== true
-      ) {
+      if (data.found !== true) {
 
         showError(
           "등록된 정보를 찾을 수 없습니다.<br><br>" +
@@ -455,28 +385,24 @@ function lookupPerson(qrCode) {
         );
 
         return;
-
       }
 
 
       displayPerson(data);
-
     }
-
   );
 
 }
 
 
 /* =====================================================
-   DISPLAY PERSON
+   DISPLAY REGISTRATION INFORMATION
 ===================================================== */
 
 function displayPerson(person) {
 
   document.getElementById("status")
     .style.display = "none";
-
 
   document.getElementById("personCard")
     .style.display = "block";
@@ -486,102 +412,75 @@ function displayPerson(person) {
     .textContent =
       person.name || "";
 
-
   document.getElementById("personEmail")
     .textContent =
       person.email || "";
-
 
   document.getElementById("personPhone")
     .textContent =
       person.phone || "";
 
-
   document.getElementById("personGender")
     .textContent =
       person.gender || "";
-
 
   document.getElementById("personAge")
     .textContent =
       person.age || "";
 
 
-  const checkInStatus =
-    document.getElementById(
-      "checkInStatus"
-    );
+  const status =
+    document.getElementById("checkInStatus");
+
+  const button =
+    document.getElementById("checkInButton");
 
 
-  const checkInButton =
-    document.getElementById(
-      "checkInButton"
-    );
-
-
-  /*
+  /* -------------------------------------------------
      이미 입장한 경우
-  */
+  ------------------------------------------------- */
 
-  if (
-    person.alreadyCheckedIn === true
-  ) {
+  if (person.alreadyCheckedIn === true) {
 
-    checkInStatus.className =
+    status.className =
       "checkin-status already-checked-in";
 
-
-    checkInStatus.innerHTML =
-
+    status.innerHTML =
       "<strong>이미 입장했습니다.</strong>" +
-
       "<br>" +
-
       "입장시각: " +
-
-      escapeHtml(
-        person.checkInTime || ""
-      );
+      escapeHtml(person.checkInTime || "");
 
 
-    /*
-       이미 입장했으므로
-       입장확인 버튼을 표시하지 않습니다.
-    */
+    // 다시 입장할 필요가 없으므로
+    // 입장확인 버튼 숨김
 
-    checkInButton.style.display =
+    button.style.display =
       "none";
 
   }
 
 
-  /*
+  /* -------------------------------------------------
      아직 입장하지 않은 경우
-  */
+  ------------------------------------------------- */
 
   else {
 
-    checkInStatus.className =
+    status.className =
       "checkin-status not-checked-in";
 
-
-    checkInStatus.innerHTML =
+    status.innerHTML =
       "아직 입장 처리되지 않았습니다.";
 
 
-    /*
-       이 경우에만 입장확인 버튼 표시
-    */
-
-    checkInButton.style.display =
+    button.style.display =
       "block";
 
-
-    checkInButton.disabled =
+    button.disabled =
       false;
 
-
-    checkInButton.textContent =
+    button.textContent =
       "입장확인";
 
   }
@@ -592,8 +491,8 @@ function displayPerson(person) {
 /* =====================================================
    CHECK-IN BUTTON
 
-   이 버튼을 눌렀을 때만
-   Apps Script가 L열을 변경합니다.
+   사용자가 입장확인을 눌렀을 때만
+   action=checkin을 호출합니다.
 ===================================================== */
 
 function confirmCheckIn() {
@@ -604,43 +503,31 @@ function confirmCheckIn() {
 
 
   const button =
-    document.getElementById(
-      "checkInButton"
-    );
+    document.getElementById("checkInButton");
 
 
-  /*
-     중복 클릭 방지
-  */
+  // 중복 클릭 방지
 
   button.disabled =
     true;
-
 
   button.textContent =
     "처리 중...";
 
 
   callApi(
-
     "checkin",
-
     currentQRCode,
 
     function(data) {
 
-      if (
-        !data ||
-        data.success !== true
-      ) {
+      if (!data || data.success !== true) {
 
         button.disabled =
           false;
 
-
         button.textContent =
           "입장확인";
-
 
         alert(
           data && data.message
@@ -648,118 +535,83 @@ function confirmCheckIn() {
             : "입장 처리 중 오류가 발생했습니다."
         );
 
-
         return;
-
       }
 
 
-      if (
-        data.found !== true
-      ) {
+      if (data.found !== true) {
 
         button.disabled =
           false;
 
-
         button.textContent =
           "입장확인";
-
 
         alert(
           "등록된 정보를 찾을 수 없습니다."
         );
 
-
         return;
-
       }
 
 
-      /*
-         입장 성공
-      */
-
       const status =
-        document.getElementById(
-          "checkInStatus"
-        );
+        document.getElementById("checkInStatus");
 
 
       status.className =
         "checkin-status completed";
 
 
-      /*
-         이미 다른 기기에서
-         먼저 입장 처리됐을 수도 있습니다.
-      */
+      /* -----------------------------------------------
+         이미 입장되어 있던 경우
+      ----------------------------------------------- */
 
-      if (
-        data.alreadyCheckedIn === true
-      ) {
+      if (data.alreadyCheckedIn === true) {
 
         status.innerHTML =
-
           "<strong>이미 입장했습니다.</strong>" +
-
           "<br>" +
-
           "입장시각: " +
-
-          escapeHtml(
-            data.checkInTime || ""
-          );
+          escapeHtml(data.checkInTime || "");
 
       }
+
+
+      /* -----------------------------------------------
+         이번에 처음 입장 처리된 경우
+      ----------------------------------------------- */
 
       else {
 
         status.innerHTML =
-
           "<strong>✓ 입장 완료</strong>" +
-
           "<br>" +
-
           "입장시각: " +
-
-          escapeHtml(
-            data.checkInTime || ""
-          );
+          escapeHtml(data.checkInTime || "");
 
       }
 
-
-      /*
-         입장 완료 후 버튼 제거
-      */
 
       button.style.display =
         "none";
 
     }
-
   );
 
 }
 
 
 /* =====================================================
-   JSONP API CALL
+   JSONP CALL
+
+   GitHub Pages → Apps Script
 ===================================================== */
 
-function callApi(
-  action,
-  qrCode,
-  callback
-) {
+function callApi(action, qrCode, callback) {
 
   requestCounter++;
 
-
-  /*
-     매 요청마다 다른 callback 이름을 사용합니다.
-  */
 
   const callbackName =
     "jsonpCallback_" +
@@ -768,110 +620,95 @@ function callApi(
     Date.now();
 
 
-  /*
-     전역 callback 생성
-  */
+  const script =
+    document.createElement("script");
+
+
+  let timeout;
+
+
+  /* -------------------------------------------------
+     Apps Script가 실행할 callback
+  ------------------------------------------------- */
 
   window[callbackName] =
     function(data) {
 
       clearTimeout(timeout);
 
-
       if (script.parentNode) {
         script.parentNode.removeChild(script);
       }
 
-
       delete window[callbackName];
 
-
       callback(data);
-
     };
 
 
-  /*
-     JSONP Script 생성
-  */
-
-  const script =
-    document.createElement("script");
-
+  /* -------------------------------------------------
+     Apps Script request
+  ------------------------------------------------- */
 
   script.src =
-
     API_URL +
-
     "?action=" +
     encodeURIComponent(action) +
-
     "&code=" +
     encodeURIComponent(qrCode) +
-
     "&callback=" +
     encodeURIComponent(callbackName) +
-
     "&t=" +
     Date.now();
 
 
-  /*
-     네트워크 오류
-  */
+  /* -------------------------------------------------
+     연결 오류
+  ------------------------------------------------- */
 
   script.onerror =
     function() {
 
       clearTimeout(timeout);
 
-
       if (script.parentNode) {
         script.parentNode.removeChild(script);
       }
 
-
       delete window[callbackName];
-
 
       showError(
         "등록 데이터베이스에 연결할 수 없습니다."
       );
-
     };
 
 
-  /*
-     10초 Timeout
-  */
+  /* -------------------------------------------------
+     15초 Timeout
+  ------------------------------------------------- */
 
-  const timeout =
+  timeout =
     setTimeout(function() {
 
       if (script.parentNode) {
         script.parentNode.removeChild(script);
       }
 
-
       delete window[callbackName];
-
 
       showError(
         "서버 응답 시간이 초과되었습니다."
       );
 
-    }, 10000);
+    }, 15000);
 
 
-  document.body.appendChild(
-    script
-  );
-
+  document.body.appendChild(script);
 }
 
 
 /* =====================================================
-   SCAN NEXT PERSON
+   NEXT PERSON
 ===================================================== */
 
 function restartScanner() {
@@ -884,10 +721,8 @@ function restartScanner() {
   document.getElementById("personCard")
     .style.display = "none";
 
-
   document.getElementById("status")
     .style.display = "block";
-
 
   document.getElementById("status")
     .innerHTML =
@@ -895,12 +730,11 @@ function restartScanner() {
 
 
   startScanner();
-
 }
 
 
 /* =====================================================
-   ERROR DISPLAY
+   ERROR
 ===================================================== */
 
 function showError(message) {
@@ -918,7 +752,6 @@ function showError(message) {
 
 
   status.innerHTML =
-
     '<div class="error">' +
     message +
     '</div>' +
@@ -926,12 +759,11 @@ function showError(message) {
     '<button onclick="restartScanner()">' +
     '다시 스캔' +
     '</button>';
-
 }
 
 
 /* =====================================================
-   ESCAPE HTML
+   HTML ESCAPE
 ===================================================== */
 
 function escapeHtml(value) {
@@ -950,12 +782,11 @@ function escapeHtml(value) {
 
 
   return div.innerHTML;
-
 }
 
 
 /* =====================================================
-   START APP
+   START
 ===================================================== */
 
 startScanner();
