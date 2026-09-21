@@ -8,37 +8,104 @@
   <title>QR Check-in</title>
 
   <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: 20px auto;
+      padding: 15px;
+      text-align: center;
+    }
+
+    #reader {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f2f2f2;
+      border-radius: 8px;
+      font-size: 20px;
+    }
+  </style>
 </head>
 
 <body>
 
 <h2>QR Check-in</h2>
 
-<div id="reader" style="width:100%; max-width:500px;"></div>
+<div id="reader"></div>
 
-<h3 id="result">Waiting for scan...</h3>
+<div id="result">
+  Point the camera at a QR code
+</div>
 
 <script>
 
-function onScanSuccess(decodedText) {
+const resultBox = document.getElementById("result");
 
-  document.getElementById("result").innerHTML =
-    "Scanned ID: " + decodedText;
-}
-
-const scanner = new Html5QrcodeScanner(
+const html5QrCode = new Html5Qrcode(
   "reader",
   {
-    fps: 10,
-    qrbox: {
-      width: 250,
-      height: 250
-    }
-  },
-  false
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.QR_CODE
+    ]
+  }
 );
 
-scanner.render(onScanSuccess);
+function onScanSuccess(decodedText, decodedResult) {
+
+  resultBox.innerHTML =
+    "Scanned ID: <strong>" + decodedText + "</strong>";
+
+  // Stop scanning after successful read
+  html5QrCode.stop()
+    .then(() => {
+      console.log("Scanner stopped.");
+    })
+    .catch(err => {
+      console.log(err);
+    });
+}
+
+const config = {
+  fps: 15,
+
+  qrbox: function(viewfinderWidth, viewfinderHeight) {
+
+    const size =
+      Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7);
+
+    return {
+      width: size,
+      height: size
+    };
+  },
+
+  aspectRatio: 1.0
+};
+
+html5QrCode.start(
+  {
+    facingMode: {
+      exact: "environment"
+    }
+  },
+  config,
+  onScanSuccess,
+  function(errorMessage) {
+    // Ignore normal scan failures while looking for QR
+  }
+)
+.catch(err => {
+
+  resultBox.innerHTML =
+    "Camera error: " + err;
+
+});
 
 </script>
 
