@@ -1,139 +1,317 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 
 <head>
+
   <meta charset="UTF-8">
 
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0">
 
-  <title>QR Check-in</title>
+  <title>입장 확인</title>
 
   <script src="https://unpkg.com/html5-qrcode"></script>
 
   <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      max-width: 500px;
-      margin: 0 auto;
+      font-family: Arial, "Noto Sans KR", sans-serif;
+      background: #f5f5f5;
+      margin: 0;
       padding: 20px;
       text-align: center;
-      background: #f5f5f5;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
     }
 
     h2 {
+      margin-top: 10px;
       margin-bottom: 20px;
+      color: #333;
     }
 
     #reader {
       width: 100%;
       background: white;
-      border-radius: 10px;
+      border-radius: 12px;
       overflow: hidden;
     }
 
-    #result {
-      margin-top: 20px;
-      padding: 20px;
+    #status {
+      margin-top: 18px;
+      padding: 16px;
       background: white;
       border-radius: 10px;
-      min-height: 70px;
-      font-size: 18px;
+      font-size: 17px;
       line-height: 1.5;
     }
 
-    .name {
-      font-size: 30px;
-      font-weight: bold;
-      margin-bottom: 10px;
+    #personCard {
+      display: none;
+      margin-top: 18px;
+      padding: 22px;
+      background: white;
+      border-radius: 12px;
+      text-align: left;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
-    .id {
+    .name {
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 18px;
+      color: #333;
+    }
+
+    .row {
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .label {
+      font-size: 13px;
+      color: #777;
+      margin-bottom: 3px;
+    }
+
+    .value {
+      font-size: 17px;
+      color: #222;
+    }
+
+    .checkin-status {
+      margin-top: 18px;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .not-checked-in {
+      background: #fff8e1;
+    }
+
+    .already-checked-in {
+      background: #e8f5e9;
+    }
+
+    .completed {
+      background: #e8f5e9;
       font-size: 18px;
     }
 
     .error {
-      font-size: 18px;
+      color: #b00020;
     }
 
     button {
-      margin-top: 15px;
-      padding: 14px 25px;
-      font-size: 18px;
+      width: 100%;
+      padding: 15px;
+      margin-top: 16px;
       border: none;
-      border-radius: 8px;
+      border-radius: 9px;
+      font-size: 18px;
       cursor: pointer;
     }
+
+    #checkInButton {
+      background: #5b3b8c;
+      color: white;
+      font-weight: bold;
+    }
+
+    #scanAgainButton {
+      background: #e0e0e0;
+      color: #222;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
   </style>
+
 </head>
 
 
 <body>
 
-<h2>QR Check-in</h2>
+<div class="container">
 
-<div id="reader"></div>
+  <h2>QR 입장 확인</h2>
 
-<div id="result">
-  Starting camera...
+  <div id="reader"></div>
+
+  <div id="status">
+    카메라를 시작하고 있습니다...
+  </div>
+
+
+  <div id="personCard">
+
+    <div id="personName"
+         class="name">
+    </div>
+
+
+    <div class="row">
+
+      <div class="label">
+        이메일
+      </div>
+
+      <div id="personEmail"
+           class="value">
+      </div>
+
+    </div>
+
+
+    <div class="row">
+
+      <div class="label">
+        전화번호
+      </div>
+
+      <div id="personPhone"
+           class="value">
+      </div>
+
+    </div>
+
+
+    <div class="row">
+
+      <div class="label">
+        성별
+      </div>
+
+      <div id="personGender"
+           class="value">
+      </div>
+
+    </div>
+
+
+    <div class="row">
+
+      <div class="label">
+        연령대
+      </div>
+
+      <div id="personAge"
+           class="value">
+      </div>
+
+    </div>
+
+
+    <div id="checkInStatus">
+    </div>
+
+
+    <button id="checkInButton"
+            onclick="confirmCheckIn()"
+            style="display:none;">
+
+      입장확인
+
+    </button>
+
+
+    <button id="scanAgainButton"
+            onclick="restartScanner()">
+
+      다음 사람 스캔
+
+    </button>
+
+  </div>
+
 </div>
-
-<button id="scanAgain"
-        onclick="restartScanner()"
-        style="display:none;">
-  Scan Again
-</button>
 
 
 <script>
 
 /* =====================================================
-   GOOGLE APPS SCRIPT
+   APPS SCRIPT WEB APP URL
 ===================================================== */
 
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbzGDh2wbmOH42S_i8XFZ5-Wg3pChVRbOaWxYB5cLmDAdf8etrcMXyAO-pllyRXAm8Ce/exec";
+  "https://script.google.com/macros/s/AKfycbxB-dp9fBRQYF6O7HTwytJXQN5Q54wxdLer2mcMvPw3GlAQStrUCtWl6kXAOgnqtc9U/exec";
+
 
 /* =====================================================
    VARIABLES
 ===================================================== */
 
-const resultBox =
-  document.getElementById("result");
+let currentQRCode = "";
 
-const scanAgainButton =
-  document.getElementById("scanAgain");
+let scannerRunning = false;
+
+let processing = false;
+
+let requestCounter = 0;
+
 
 const html5QrCode =
   new Html5Qrcode("reader");
 
-let processing = false;
-let scannerRunning = false;
-let jsonpTimer = null;
-
 
 /* =====================================================
-   START SCANNER
+   START QR SCANNER
 ===================================================== */
 
 function startScanner() {
 
   processing = false;
 
-  scanAgainButton.style.display =
-    "none";
+  currentQRCode = "";
 
-  resultBox.innerHTML =
-    "Starting camera...";
+
+  document.getElementById("personCard")
+    .style.display = "none";
+
+
+  document.getElementById("status")
+    .style.display = "block";
+
+
+  document.getElementById("status")
+    .innerHTML =
+      "QR Code를 카메라에 보여주세요.";
 
 
   const config = {
 
     fps: 15,
 
-    qrbox: {
-      width: 250,
-      height: 250
+    qrbox: function(
+      viewfinderWidth,
+      viewfinderHeight
+    ) {
+
+      const size =
+        Math.floor(
+          Math.min(
+            viewfinderWidth,
+            viewfinderHeight
+          ) * 0.7
+        );
+
+      return {
+        width: size,
+        height: size
+      };
+
     }
 
   };
@@ -149,9 +327,9 @@ function startScanner() {
 
     onScanSuccess,
 
-    function(scanError) {
-      // QR not detected yet.
-      // Keep scanning.
+    function() {
+      // QR Code를 찾는 동안 발생하는
+      // 반복적인 메시지는 무시합니다.
     }
 
   )
@@ -160,20 +338,16 @@ function startScanner() {
 
     scannerRunning = true;
 
-    resultBox.innerHTML =
-      "Point the camera at a QR code";
-
   })
 
   .catch(function(error) {
 
     scannerRunning = false;
 
-    resultBox.innerHTML =
-      '<div class="error">' +
-      'Camera error:<br><br>' +
-      escapeHtml(String(error)) +
-      '</div>';
+    showError(
+      "카메라를 시작할 수 없습니다.<br><br>" +
+      escapeHtml(String(error))
+    );
 
   });
 
@@ -181,7 +355,7 @@ function startScanner() {
 
 
 /* =====================================================
-   QR DETECTED
+   QR SUCCESSFULLY SCANNED
 ===================================================== */
 
 function onScanSuccess(decodedText) {
@@ -190,199 +364,514 @@ function onScanSuccess(decodedText) {
     return;
   }
 
+
   processing = true;
 
 
-  resultBox.innerHTML =
-    "QR detected: <strong>" +
-    escapeHtml(decodedText) +
-    "</strong><br><br>" +
-    "Stopping camera...";
+  currentQRCode =
+    String(decodedText).trim();
 
+
+  document.getElementById("status")
+    .innerHTML =
+      "QR Code 확인 중...";
+
+
+  /*
+     QR을 읽으면 카메라를 정지시킵니다.
+  */
 
   html5QrCode.stop()
 
-  .then(function() {
+    .then(function() {
 
-    scannerRunning = false;
+      scannerRunning = false;
 
-    lookupPerson(decodedText);
+      lookupPerson(
+        currentQRCode
+      );
 
-  })
+    })
 
-  .catch(function() {
+    .catch(function() {
 
-    scannerRunning = false;
+      scannerRunning = false;
 
-    lookupPerson(decodedText);
+      lookupPerson(
+        currentQRCode
+      );
 
-  });
+    });
 
 }
 
 
 /* =====================================================
-   CONTACT APPS SCRIPT USING JSONP
+   LOOKUP PERSON
+
+   중요:
+   여기서는 입장시각을 기록하지 않습니다.
 ===================================================== */
 
-function lookupPerson(id) {
+function lookupPerson(qrCode) {
 
-  resultBox.innerHTML =
-    "QR detected: <strong>" +
-    escapeHtml(id) +
-    "</strong><br><br>" +
-    "Contacting database...";
+  document.getElementById("status")
+    .innerHTML =
+      "등록정보를 확인하고 있습니다...";
 
 
-  /* Remove previous request */
+  callApi(
 
-  const oldScript =
-    document.getElementById("jsonp-script");
+    "lookup",
 
-  if (oldScript) {
-    oldScript.remove();
+    qrCode,
+
+    function(data) {
+
+      if (
+        !data ||
+        data.success !== true
+      ) {
+
+        showError(
+          data && data.message
+            ? data.message
+            : "등록정보를 확인할 수 없습니다."
+        );
+
+        return;
+
+      }
+
+
+      if (
+        data.found !== true
+      ) {
+
+        showError(
+          "등록된 정보를 찾을 수 없습니다.<br><br>" +
+          "QR Code: " +
+          escapeHtml(qrCode)
+        );
+
+        return;
+
+      }
+
+
+      displayPerson(data);
+
+    }
+
+  );
+
+}
+
+
+/* =====================================================
+   DISPLAY PERSON
+===================================================== */
+
+function displayPerson(person) {
+
+  document.getElementById("status")
+    .style.display = "none";
+
+
+  document.getElementById("personCard")
+    .style.display = "block";
+
+
+  document.getElementById("personName")
+    .textContent =
+      person.name || "";
+
+
+  document.getElementById("personEmail")
+    .textContent =
+      person.email || "";
+
+
+  document.getElementById("personPhone")
+    .textContent =
+      person.phone || "";
+
+
+  document.getElementById("personGender")
+    .textContent =
+      person.gender || "";
+
+
+  document.getElementById("personAge")
+    .textContent =
+      person.age || "";
+
+
+  const checkInStatus =
+    document.getElementById(
+      "checkInStatus"
+    );
+
+
+  const checkInButton =
+    document.getElementById(
+      "checkInButton"
+    );
+
+
+  /*
+     이미 입장한 경우
+  */
+
+  if (
+    person.alreadyCheckedIn === true
+  ) {
+
+    checkInStatus.className =
+      "checkin-status already-checked-in";
+
+
+    checkInStatus.innerHTML =
+
+      "<strong>이미 입장했습니다.</strong>" +
+
+      "<br>" +
+
+      "입장시각: " +
+
+      escapeHtml(
+        person.checkInTime || ""
+      );
+
+
+    /*
+       이미 입장했으므로
+       입장확인 버튼을 표시하지 않습니다.
+    */
+
+    checkInButton.style.display =
+      "none";
+
   }
 
 
-  /* Create JSONP request */
+  /*
+     아직 입장하지 않은 경우
+  */
 
-  const script =
-    document.createElement("script");
+  else {
 
-  script.id =
-    "jsonp-script";
+    checkInStatus.className =
+      "checkin-status not-checked-in";
 
 
-  script.src =
-    API_URL +
-    "?id=" +
-    encodeURIComponent(id) +
-    "&callback=handleResult" +
-    "&t=" +
+    checkInStatus.innerHTML =
+      "아직 입장 처리되지 않았습니다.";
+
+
+    /*
+       이 경우에만 입장확인 버튼 표시
+    */
+
+    checkInButton.style.display =
+      "block";
+
+
+    checkInButton.disabled =
+      false;
+
+
+    checkInButton.textContent =
+      "입장확인";
+
+  }
+
+}
+
+
+/* =====================================================
+   CHECK-IN BUTTON
+
+   이 버튼을 눌렀을 때만
+   Apps Script가 L열을 변경합니다.
+===================================================== */
+
+function confirmCheckIn() {
+
+  if (!currentQRCode) {
+    return;
+  }
+
+
+  const button =
+    document.getElementById(
+      "checkInButton"
+    );
+
+
+  /*
+     중복 클릭 방지
+  */
+
+  button.disabled =
+    true;
+
+
+  button.textContent =
+    "처리 중...";
+
+
+  callApi(
+
+    "checkin",
+
+    currentQRCode,
+
+    function(data) {
+
+      if (
+        !data ||
+        data.success !== true
+      ) {
+
+        button.disabled =
+          false;
+
+
+        button.textContent =
+          "입장확인";
+
+
+        alert(
+          data && data.message
+            ? data.message
+            : "입장 처리 중 오류가 발생했습니다."
+        );
+
+
+        return;
+
+      }
+
+
+      if (
+        data.found !== true
+      ) {
+
+        button.disabled =
+          false;
+
+
+        button.textContent =
+          "입장확인";
+
+
+        alert(
+          "등록된 정보를 찾을 수 없습니다."
+        );
+
+
+        return;
+
+      }
+
+
+      /*
+         입장 성공
+      */
+
+      const status =
+        document.getElementById(
+          "checkInStatus"
+        );
+
+
+      status.className =
+        "checkin-status completed";
+
+
+      /*
+         이미 다른 기기에서
+         먼저 입장 처리됐을 수도 있습니다.
+      */
+
+      if (
+        data.alreadyCheckedIn === true
+      ) {
+
+        status.innerHTML =
+
+          "<strong>이미 입장했습니다.</strong>" +
+
+          "<br>" +
+
+          "입장시각: " +
+
+          escapeHtml(
+            data.checkInTime || ""
+          );
+
+      }
+
+      else {
+
+        status.innerHTML =
+
+          "<strong>✓ 입장 완료</strong>" +
+
+          "<br>" +
+
+          "입장시각: " +
+
+          escapeHtml(
+            data.checkInTime || ""
+          );
+
+      }
+
+
+      /*
+         입장 완료 후 버튼 제거
+      */
+
+      button.style.display =
+        "none";
+
+    }
+
+  );
+
+}
+
+
+/* =====================================================
+   JSONP API CALL
+===================================================== */
+
+function callApi(
+  action,
+  qrCode,
+  callback
+) {
+
+  requestCounter++;
+
+
+  /*
+     매 요청마다 다른 callback 이름을 사용합니다.
+  */
+
+  const callbackName =
+    "jsonpCallback_" +
+    requestCounter +
+    "_" +
     Date.now();
 
 
-  /* Network/load failure */
+  /*
+     전역 callback 생성
+  */
 
-  script.onerror =
-    function() {
+  window[callbackName] =
+    function(data) {
 
-      clearTimeout(jsonpTimer);
+      clearTimeout(timeout);
 
-      resultBox.innerHTML =
-        '<div class="error">' +
-        'Could not contact the database.' +
-        '</div>';
 
-      scanAgainButton.style.display =
-        "inline-block";
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+
+
+      delete window[callbackName];
+
+
+      callback(data);
 
     };
 
 
   /*
-     Timeout gives us a visible error if
-     Apps Script never calls handleResult().
+     JSONP Script 생성
   */
 
-  jsonpTimer =
+  const script =
+    document.createElement("script");
+
+
+  script.src =
+
+    API_URL +
+
+    "?action=" +
+    encodeURIComponent(action) +
+
+    "&code=" +
+    encodeURIComponent(qrCode) +
+
+    "&callback=" +
+    encodeURIComponent(callbackName) +
+
+    "&t=" +
+    Date.now();
+
+
+  /*
+     네트워크 오류
+  */
+
+  script.onerror =
+    function() {
+
+      clearTimeout(timeout);
+
+
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+
+
+      delete window[callbackName];
+
+
+      showError(
+        "등록 데이터베이스에 연결할 수 없습니다."
+      );
+
+    };
+
+
+  /*
+     10초 Timeout
+  */
+
+  const timeout =
     setTimeout(function() {
 
-      resultBox.innerHTML =
-        '<div class="error">' +
-        'Database request timed out.' +
-        '</div>';
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
 
-      scanAgainButton.style.display =
-        "inline-block";
+
+      delete window[callbackName];
+
+
+      showError(
+        "서버 응답 시간이 초과되었습니다."
+      );
 
     }, 10000);
 
 
-  document.body.appendChild(script);
+  document.body.appendChild(
+    script
+  );
 
 }
 
 
 /* =====================================================
-   RESPONSE FROM APPS SCRIPT
-===================================================== */
-
-function handleResult(person) {
-
-  clearTimeout(jsonpTimer);
-
-
-  if (
-    person.success === true &&
-    person.found === true
-  ) {
-
-    resultBox.innerHTML =
-
-      '<div class="name">' +
-      escapeHtml(String(person.name)) +
-      '</div>' +
-
-      '<div class="id">' +
-      'ID: ' +
-      escapeHtml(String(person.id)) +
-      '</div>';
-
-  }
-
-
-  else if (
-    person.success === true &&
-    person.found === false
-  ) {
-
-    resultBox.innerHTML =
-
-      '<div class="error">' +
-
-      'ID not found' +
-
-      '<br><br>' +
-
-      'Scanned ID: ' +
-      escapeHtml(String(person.id || "")) +
-
-      '</div>';
-
-  }
-
-
-  else {
-
-    resultBox.innerHTML =
-
-      '<div class="error">' +
-
-      'Database error' +
-
-      '<br><br>' +
-
-      escapeHtml(
-        String(
-          person.message ||
-          "Unknown error"
-        )
-      ) +
-
-      '</div>';
-
-  }
-
-
-  scanAgainButton.style.display =
-    "inline-block";
-
-}
-
-
-/* =====================================================
-   SCAN AGAIN
+   SCAN NEXT PERSON
 ===================================================== */
 
 function restartScanner() {
@@ -391,13 +880,58 @@ function restartScanner() {
     return;
   }
 
+
+  document.getElementById("personCard")
+    .style.display = "none";
+
+
+  document.getElementById("status")
+    .style.display = "block";
+
+
+  document.getElementById("status")
+    .innerHTML =
+      "카메라를 다시 시작하고 있습니다...";
+
+
   startScanner();
 
 }
 
 
 /* =====================================================
-   SAFE TEXT DISPLAY
+   ERROR DISPLAY
+===================================================== */
+
+function showError(message) {
+
+  document.getElementById("personCard")
+    .style.display = "none";
+
+
+  const status =
+    document.getElementById("status");
+
+
+  status.style.display =
+    "block";
+
+
+  status.innerHTML =
+
+    '<div class="error">' +
+    message +
+    '</div>' +
+
+    '<button onclick="restartScanner()">' +
+    '다시 스캔' +
+    '</button>';
+
+}
+
+
+/* =====================================================
+   ESCAPE HTML
 ===================================================== */
 
 function escapeHtml(value) {
@@ -405,8 +939,15 @@ function escapeHtml(value) {
   const div =
     document.createElement("div");
 
+
   div.textContent =
-    value;
+    String(
+      value === undefined ||
+      value === null
+        ? ""
+        : value
+    );
+
 
   return div.innerHTML;
 
@@ -414,7 +955,7 @@ function escapeHtml(value) {
 
 
 /* =====================================================
-   START
+   START APP
 ===================================================== */
 
 startScanner();
