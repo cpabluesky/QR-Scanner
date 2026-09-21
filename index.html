@@ -47,10 +47,12 @@
 
     .success {
       font-size: 20px;
+      line-height: 1.6;
     }
 
     .error {
       font-size: 20px;
+      line-height: 1.5;
     }
 
     button {
@@ -61,6 +63,7 @@
     }
   </style>
 </head>
+
 
 <body>
 
@@ -81,17 +84,17 @@
 
 <script>
 
-/* ------------------------------------------
-   GOOGLE APPS SCRIPT API
------------------------------------------- */
+/* =====================================================
+   GOOGLE APPS SCRIPT URL
+===================================================== */
 
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbwzYW7bofsuU2SDX7nTQ7y7I48blBtOB4dV1hjWOs2PI43jYyaXYLhu1lzbu3qq3xbN/exec";
+  "https://script.google.com/macros/s/AKfycbzGDh2wbmOH42S_i8XFZ5-Wg3pChVRbOaWxYB5cLmDAdf8etrcMXyAO-pllyRXAm8Ce/exec";
 
 
-/* ------------------------------------------
+/* =====================================================
    QR SCANNER
------------------------------------------- */
+===================================================== */
 
 const html5QrCode =
   new Html5Qrcode(
@@ -107,9 +110,9 @@ let scanning = false;
 let processing = false;
 
 
-/* ------------------------------------------
+/* =====================================================
    START CAMERA
------------------------------------------- */
+===================================================== */
 
 function startScanner() {
 
@@ -120,6 +123,7 @@ function startScanner() {
     "none";
 
   processing = false;
+
 
   const config = {
 
@@ -160,24 +164,30 @@ function startScanner() {
   )
 
   .then(() => {
+
     scanning = true;
+
   })
 
   .catch(error => {
 
     document.getElementById("result").innerHTML =
+
       '<div class="error">' +
+
       'Camera error:<br>' +
+
       escapeHtml(String(error)) +
+
       '</div>';
 
   });
 }
 
 
-/* ------------------------------------------
+/* =====================================================
    QR DETECTED
------------------------------------------- */
+===================================================== */
 
 function onScanSuccess(decodedText) {
 
@@ -187,9 +197,13 @@ function onScanSuccess(decodedText) {
 
   processing = true;
 
+
   document.getElementById("result").innerHTML =
+
     "QR detected: " +
+
     escapeHtml(decodedText) +
+
     "<br><br>Looking up registration...";
 
 
@@ -213,95 +227,129 @@ function onScanSuccess(decodedText) {
 }
 
 
-/* ------------------------------------------
-   LOOK UP GOOGLE SHEET
------------------------------------------- */
+/* =====================================================
+   LOOK UP PERSON USING JSONP
+===================================================== */
 
-async function lookupPerson(id) {
+function lookupPerson(id) {
 
-  try {
+  /*
+    Remove an old JSONP script if one exists.
+  */
 
-    const url =
-      API_URL +
-      "?id=" +
-      encodeURIComponent(id);
+  const oldScript =
+    document.getElementById("jsonpRequest");
 
-
-    const response =
-      await fetch(url);
-
-
-    if (!response.ok) {
-
-      throw new Error(
-        "Server response: " +
-        response.status
-      );
-    }
-
-
-    const person =
-      await response.json();
-
-
-    showResult(person);
-
+  if (oldScript) {
+    oldScript.remove();
   }
 
-  catch (error) {
 
-    document.getElementById("result").innerHTML =
+  /*
+    Create a new script element.
 
-      '<div class="error">' +
+    Example request:
 
-      'Unable to retrieve registration.' +
+    /exec?id=2&callback=handleResult
+  */
 
-      '<br><br>' +
+  const script =
+    document.createElement("script");
 
-      escapeHtml(error.message) +
+  script.id =
+    "jsonpRequest";
 
-      '</div>';
+
+  script.src =
+    API_URL +
+    "?id=" +
+    encodeURIComponent(id) +
+    "&callback=handleResult" +
+    "&_=" +
+    Date.now();
 
 
-    document.getElementById("scanAgain").style.display =
-      "inline-block";
-  }
+  /*
+    If the Apps Script endpoint itself
+    cannot be loaded.
+  */
+
+  script.onerror =
+    function() {
+
+      document.getElementById("result").innerHTML =
+
+        '<div class="error">' +
+
+        'Unable to contact registration database.' +
+
+        '</div>';
+
+
+      document.getElementById("scanAgain")
+        .style.display =
+        "inline-block";
+    };
+
+
+  document.body.appendChild(script);
 }
 
 
-/* ------------------------------------------
-   DISPLAY PERSON
------------------------------------------- */
+/* =====================================================
+   APPS SCRIPT CALLBACK
 
-function showResult(person) {
+   Code.gs returns:
+
+   handleResult({...});
+===================================================== */
+
+function handleResult(person) {
 
   const result =
     document.getElementById("result");
 
 
-  if (person.success && person.found) {
+  if (
+    person.success &&
+    person.found
+  ) {
 
     result.innerHTML =
 
       '<div class="name">' +
-      escapeHtml(String(person.name)) +
+
+      escapeHtml(
+        String(person.name)
+      ) +
+
       '</div>' +
 
       '<div class="success">' +
 
       'ID: ' +
-      escapeHtml(String(person.id)) +
+
+      escapeHtml(
+        String(person.id)
+      ) +
 
       '<br>' +
 
       'Status: ' +
-      escapeHtml(String(person.status)) +
+
+      escapeHtml(
+        String(person.status)
+      ) +
 
       '</div>';
 
   }
 
-  else if (person.success && !person.found) {
+
+  else if (
+    person.success &&
+    !person.found
+  ) {
 
     result.innerHTML =
 
@@ -312,11 +360,15 @@ function showResult(person) {
       '<br><br>' +
 
       'Scanned ID: ' +
-      escapeHtml(String(person.id || "")) +
+
+      escapeHtml(
+        String(person.id || "")
+      ) +
 
       '</div>';
 
   }
+
 
   else {
 
@@ -339,14 +391,15 @@ function showResult(person) {
   }
 
 
-  document.getElementById("scanAgain").style.display =
+  document.getElementById("scanAgain")
+    .style.display =
     "inline-block";
 }
 
 
-/* ------------------------------------------
+/* =====================================================
    SCAN AGAIN
------------------------------------------- */
+===================================================== */
 
 function restartScanner() {
 
@@ -358,28 +411,30 @@ function restartScanner() {
 }
 
 
-/* ------------------------------------------
+/* =====================================================
    ESCAPE HTML
------------------------------------------- */
+===================================================== */
 
 function escapeHtml(value) {
 
   const div =
     document.createElement("div");
 
-  div.textContent = value;
+  div.textContent =
+    value;
 
   return div.innerHTML;
 }
 
 
-/* ------------------------------------------
-   START AUTOMATICALLY
------------------------------------------- */
+/* =====================================================
+   START SCANNER
+===================================================== */
 
 startScanner();
 
 </script>
 
 </body>
+
 </html>
