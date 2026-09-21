@@ -7,6 +7,7 @@
 
   <title>QR 입장 확인</title>
 
+  <!-- QR Scanner Library -->
   <script src="https://unpkg.com/html5-qrcode"></script>
 
   <style>
@@ -30,6 +31,7 @@
 
     h2 {
       margin: 10px 0 20px;
+      color: #333;
     }
 
     #cameraStartArea {
@@ -38,6 +40,11 @@
       border-radius: 12px;
       margin-bottom: 18px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    #cameraStartArea p {
+      margin-top: 0;
+      line-height: 1.6;
     }
 
     #reader {
@@ -70,6 +77,7 @@
       font-size: 28px;
       font-weight: bold;
       margin-bottom: 18px;
+      color: #333;
     }
 
     .row {
@@ -85,6 +93,7 @@
 
     .value {
       font-size: 17px;
+      color: #222;
       word-break: break-word;
     }
 
@@ -137,6 +146,7 @@
 
     button:disabled {
       opacity: 0.55;
+      cursor: default;
     }
   </style>
 </head>
@@ -148,6 +158,11 @@
 
   <h2>QR 입장 확인</h2>
 
+
+  <!-- ================================
+       CAMERA START
+  ================================= -->
+
   <div id="cameraStartArea">
 
     <p>
@@ -157,19 +172,33 @@
     <button
       id="cameraStartButton"
       onclick="requestCamera()">
+
       카메라 시작
+
     </button>
 
   </div>
 
 
+  <!-- ================================
+       QR READER
+  ================================= -->
+
   <div id="reader"></div>
 
+
+  <!-- ================================
+       STATUS
+  ================================= -->
 
   <div id="status">
     위의 「카메라 시작」 버튼을 눌러주세요.
   </div>
 
+
+  <!-- ================================
+       PERSON INFORMATION
+  ================================= -->
 
   <div id="personCard">
 
@@ -177,26 +206,46 @@
 
 
     <div class="row">
-      <div class="label">이메일</div>
+
+      <div class="label">
+        이메일
+      </div>
+
       <div id="personEmail" class="value"></div>
+
     </div>
 
 
     <div class="row">
-      <div class="label">전화번호</div>
+
+      <div class="label">
+        전화번호
+      </div>
+
       <div id="personPhone" class="value"></div>
+
     </div>
 
 
     <div class="row">
-      <div class="label">성별</div>
+
+      <div class="label">
+        성별
+      </div>
+
       <div id="personGender" class="value"></div>
+
     </div>
 
 
     <div class="row">
-      <div class="label">연령대</div>
+
+      <div class="label">
+        연령대
+      </div>
+
       <div id="personAge" class="value"></div>
+
     </div>
 
 
@@ -207,14 +256,18 @@
       id="checkInButton"
       onclick="confirmCheckIn()"
       style="display:none;">
+
       입장확인
+
     </button>
 
 
     <button
       id="scanAgainButton"
       onclick="restartScanner()">
+
       다음 사람 스캔
+
     </button>
 
   </div>
@@ -225,7 +278,7 @@
 <script>
 
 /* =====================================================
-   APPS SCRIPT URL
+   GOOGLE APPS SCRIPT
 ===================================================== */
 
 const API_URL =
@@ -237,27 +290,36 @@ const API_URL =
 ===================================================== */
 
 let currentQRCode = "";
+
 let scannerRunning = false;
+
 let processing = false;
+
 let requestCounter = 0;
-let cameraPermissionGranted = false;
+
+let selectedCameraId = null;
+
 
 const html5QrCode =
   new Html5Qrcode("reader");
 
 
 /* =====================================================
-   CAMERA START BUTTON
+   1. CAMERA START BUTTON
 
-   여기서는 별도의 getUserMedia()를 호출하지 않습니다.
+   카메라 목록을 가져옵니다.
 
-   html5-qrcode 자체가 카메라 Permission을 요청합니다.
+   중요:
+   이 코드에는 facingMode를 사용하지 않습니다.
 ===================================================== */
 
 function requestCamera() {
 
   const button =
-    document.getElementById("cameraStartButton");
+    document.getElementById(
+      "cameraStartButton"
+    );
+
 
   button.disabled = true;
 
@@ -265,20 +327,163 @@ function requestCamera() {
     "카메라 연결 중...";
 
 
-  document.getElementById("status").innerHTML =
+  document.getElementById(
+    "status"
+  ).innerHTML =
     "카메라 사용 권한을 확인하고 있습니다...";
 
 
-  startScanner();
+  /*
+    getCameras()가 필요한 경우
+    브라우저의 Camera Permission을 요청합니다.
+  */
+
+  Html5Qrcode.getCameras()
+
+    .then(function(cameras) {
+
+
+      if (
+        !cameras ||
+        cameras.length === 0
+      ) {
+
+        throw new Error(
+          "사용 가능한 카메라를 찾을 수 없습니다."
+        );
+
+      }
+
+
+      /*
+        기본값:
+
+        iPhone에서는 일반적으로
+        후면 카메라가 뒤쪽에 나오는 경우가 많으므로
+        마지막 카메라를 기본값으로 선택합니다.
+      */
+
+      let selectedCamera =
+        cameras[cameras.length - 1];
+
+
+      /*
+        Camera label을 확인할 수 있다면
+        후면 카메라를 우선적으로 찾습니다.
+      */
+
+      for (
+        let i = 0;
+        i < cameras.length;
+        i++
+      ) {
+
+        const label =
+          String(
+            cameras[i].label || ""
+          ).toLowerCase();
+
+
+        if (
+          label.includes("back") ||
+          label.includes("rear") ||
+          label.includes("environment")
+        ) {
+
+          selectedCamera =
+            cameras[i];
+
+          break;
+
+        }
+
+      }
+
+
+      /*
+        실제 Camera ID 저장
+      */
+
+      selectedCameraId =
+        selectedCamera.id;
+
+
+      /*
+        카메라 시작
+      */
+
+      return startScanner();
+
+    })
+
+
+    .catch(function(error) {
+
+
+      selectedCameraId =
+        null;
+
+
+      button.disabled =
+        false;
+
+
+      button.textContent =
+        "카메라 시작";
+
+
+      document.getElementById(
+        "cameraStartArea"
+      ).style.display =
+        "block";
+
+
+      document.getElementById(
+        "status"
+      ).innerHTML =
+
+        '<div class="error">' +
+
+        '<strong>카메라를 사용할 수 없습니다.</strong>' +
+
+        '<br><br>' +
+
+        escapeHtml(
+          String(error)
+        ) +
+
+        '<br><br>' +
+
+        'iPhone 설정에서 Safari의 카메라 사용 권한을 확인한 후 ' +
+        '다시 시도해 주세요.' +
+
+        '</div>';
+
+    });
 
 }
 
 
 /* =====================================================
-   START SCANNER
+   2. START SCANNER
+
+   Camera ID를 직접 전달합니다.
+
+   facingMode는 사용하지 않습니다.
 ===================================================== */
 
 function startScanner() {
+
+  if (!selectedCameraId) {
+
+    return Promise.reject(
+      new Error(
+        "카메라가 선택되지 않았습니다."
+      )
+    );
+
+  }
+
 
   processing = false;
 
@@ -287,19 +492,28 @@ function startScanner() {
 
   document.getElementById(
     "personCard"
-  ).style.display = "none";
+  ).style.display =
+    "none";
 
 
   document.getElementById(
     "status"
-  ).style.display = "block";
+  ).style.display =
+    "block";
 
 
   document.getElementById(
     "status"
   ).innerHTML =
-    "카메라 사용을 허용해 주세요.";
+    "카메라를 시작하고 있습니다...";
 
+
+  /*
+    QR Scanner 설정
+
+    여기에도 카메라 방향 관련 옵션은
+    전혀 사용하지 않습니다.
+  */
 
   const config = {
 
@@ -314,35 +528,42 @@ function startScanner() {
 
 
   /*
-    중요:
+    selectedCameraId는 단순 문자열입니다.
 
-    facingMode를 문자열로만 전달합니다.
-
-    ideal 객체는 전혀 사용하지 않습니다.
+    예:
+    "8C75ECA2..."
   */
 
-  html5QrCode.start(
+  return html5QrCode.start(
 
-    {
-      facingMode: "environment"
-    },
+    selectedCameraId,
 
     config,
 
     onScanSuccess,
 
     function(errorMessage) {
-      // QR을 찾지 못하는 동안의 오류는 무시
+
+      /*
+        QR Code를 찾는 동안 발생하는
+        반복적인 scan error는 무시합니다.
+      */
+
     }
 
   )
 
   .then(function() {
 
-    scannerRunning = true;
 
-    cameraPermissionGranted = true;
+    scannerRunning =
+      true;
 
+
+    /*
+      카메라가 정상적으로 시작된 후에만
+      시작 버튼 영역을 숨깁니다.
+    */
 
     document.getElementById(
       "cameraStartArea"
@@ -355,50 +576,6 @@ function startScanner() {
     ).innerHTML =
       "QR Code를 카메라에 보여주세요.";
 
-  })
-
-  .catch(function(error) {
-
-    scannerRunning = false;
-
-    cameraPermissionGranted = false;
-
-
-    const button =
-      document.getElementById(
-        "cameraStartButton"
-      );
-
-
-    button.disabled = false;
-
-    button.textContent =
-      "카메라 시작";
-
-
-    document.getElementById(
-      "cameraStartArea"
-    ).style.display =
-      "block";
-
-
-    document.getElementById(
-      "status"
-    ).innerHTML =
-
-      '<div class="error">' +
-
-      '<strong>카메라를 시작할 수 없습니다.</strong>' +
-
-      '<br><br>' +
-
-      escapeHtml(String(error)) +
-
-      '<br><br>' +
-
-      '브라우저의 카메라 권한을 확인한 후 다시 시도해 주세요.' +
-
-      '</div>';
 
   });
 
@@ -406,17 +583,24 @@ function startScanner() {
 
 
 /* =====================================================
-   QR DETECTED
+   3. QR CODE DETECTED
 ===================================================== */
 
 function onScanSuccess(decodedText) {
 
+  /*
+    중복 QR 인식 방지
+  */
+
   if (processing) {
+
     return;
+
   }
 
 
-  processing = true;
+  processing =
+    true;
 
 
   currentQRCode =
@@ -426,24 +610,45 @@ function onScanSuccess(decodedText) {
   document.getElementById(
     "status"
   ).innerHTML =
+
+    "QR Code를 인식했습니다." +
+
+    "<br>" +
+
     "등록정보를 확인하고 있습니다...";
 
+
+  /*
+    QR 인식 후 카메라 중지
+  */
 
   html5QrCode.stop()
 
     .then(function() {
 
-      scannerRunning = false;
 
-      lookupPerson(currentQRCode);
+      scannerRunning =
+        false;
+
+
+      lookupPerson(
+        currentQRCode
+      );
+
 
     })
 
     .catch(function() {
 
-      scannerRunning = false;
 
-      lookupPerson(currentQRCode);
+      scannerRunning =
+        false;
+
+
+      lookupPerson(
+        currentQRCode
+      );
+
 
     });
 
@@ -451,7 +656,11 @@ function onScanSuccess(decodedText) {
 
 
 /* =====================================================
-   LOOKUP
+   4. LOOKUP PERSON
+
+   action = lookup
+
+   여기서는 Sheet를 수정하지 않습니다.
 ===================================================== */
 
 function lookupPerson(qrCode) {
@@ -472,8 +681,13 @@ function lookupPerson(qrCode) {
 
         showError(
 
-          data && data.message
-            ? escapeHtml(data.message)
+          data &&
+          data.message
+
+            ? escapeHtml(
+                data.message
+              )
+
             : "등록정보를 확인할 수 없습니다."
 
         );
@@ -483,7 +697,13 @@ function lookupPerson(qrCode) {
       }
 
 
-      if (data.found !== true) {
+      /*
+        QR Code가 등록되어 있지 않은 경우
+      */
+
+      if (
+        data.found !== true
+      ) {
 
         showError(
 
@@ -502,6 +722,10 @@ function lookupPerson(qrCode) {
       }
 
 
+      /*
+        등록정보 표시
+      */
+
       displayPerson(data);
 
     }
@@ -512,7 +736,7 @@ function lookupPerson(qrCode) {
 
 
 /* =====================================================
-   DISPLAY PERSON
+   5. DISPLAY PERSON
 ===================================================== */
 
 function displayPerson(person) {
@@ -528,6 +752,10 @@ function displayPerson(person) {
   ).style.display =
     "block";
 
+
+  /* ---------------------------------------------
+     PERSONAL INFORMATION
+  --------------------------------------------- */
 
   document.getElementById(
     "personName"
@@ -571,11 +799,13 @@ function displayPerson(person) {
     );
 
 
-  /*
-    이미 입장한 경우
-  */
+  /* =================================================
+     ALREADY CHECKED IN
+  ================================================= */
 
-  if (person.alreadyCheckedIn === true) {
+  if (
+    person.alreadyCheckedIn === true
+  ) {
 
     status.className =
       "checkin-status already-checked-in";
@@ -594,15 +824,20 @@ function displayPerson(person) {
       );
 
 
+    /*
+      이미 입장했으므로
+      입장확인 버튼을 표시하지 않습니다.
+    */
+
     button.style.display =
       "none";
 
   }
 
 
-  /*
-    아직 입장하지 않은 경우
-  */
+  /* =================================================
+     NOT CHECKED IN
+  ================================================= */
 
   else {
 
@@ -631,13 +866,19 @@ function displayPerson(person) {
 
 
 /* =====================================================
-   CHECK-IN
+   6. CHECK-IN
+
+   입장확인 버튼을 눌렀을 때만 실행됩니다.
+
+   Apps Script에서 L열에 입장시각을 기록합니다.
 ===================================================== */
 
 function confirmCheckIn() {
 
   if (!currentQRCode) {
+
     return;
+
   }
 
 
@@ -646,6 +887,10 @@ function confirmCheckIn() {
       "checkInButton"
     );
 
+
+  /*
+    중복 클릭 방지
+  */
 
   button.disabled =
     true;
@@ -664,6 +909,10 @@ function confirmCheckIn() {
     function(data) {
 
 
+      /* ---------------------------------------------
+         SERVER ERROR
+      --------------------------------------------- */
+
       if (
         !data ||
         data.success !== true
@@ -679,7 +928,8 @@ function confirmCheckIn() {
 
         alert(
 
-          data && data.message
+          data &&
+          data.message
 
             ? data.message
 
@@ -692,7 +942,13 @@ function confirmCheckIn() {
       }
 
 
-      if (data.found !== true) {
+      /* ---------------------------------------------
+         QR NOT FOUND
+      --------------------------------------------- */
+
+      if (
+        data.found !== true
+      ) {
 
         button.disabled =
           false;
@@ -706,6 +962,7 @@ function confirmCheckIn() {
           "등록된 정보를 찾을 수 없습니다."
         );
 
+
         return;
 
       }
@@ -717,11 +974,13 @@ function confirmCheckIn() {
         );
 
 
-      /*
-        이미 입장한 경우
-      */
+      /* =============================================
+         ALREADY CHECKED IN
+      ============================================= */
 
-      if (data.alreadyCheckedIn === true) {
+      if (
+        data.alreadyCheckedIn === true
+      ) {
 
         status.className =
           "checkin-status already-checked-in";
@@ -742,9 +1001,9 @@ function confirmCheckIn() {
       }
 
 
-      /*
-        이번에 최초 입장
-      */
+      /* =============================================
+         NEW CHECK-IN
+      ============================================= */
 
       else {
 
@@ -767,6 +1026,11 @@ function confirmCheckIn() {
       }
 
 
+      /*
+        처리 완료 후
+        입장확인 버튼 숨김
+      */
+
       button.style.display =
         "none";
 
@@ -778,7 +1042,9 @@ function confirmCheckIn() {
 
 
 /* =====================================================
-   JSONP API
+   7. JSONP API
+
+   GitHub Pages → Google Apps Script
 ===================================================== */
 
 function callApi(
@@ -810,14 +1076,22 @@ function callApi(
   let timeout;
 
 
+  /* ---------------------------------------------
+     CALLBACK
+  --------------------------------------------- */
+
   window[callbackName] =
     function(data) {
 
 
-      clearTimeout(timeout);
+      clearTimeout(
+        timeout
+      );
 
 
-      if (script.parentNode) {
+      if (
+        script.parentNode
+      ) {
 
         script.parentNode.removeChild(
           script
@@ -836,35 +1110,53 @@ function callApi(
     };
 
 
+  /* ---------------------------------------------
+     REQUEST URL
+  --------------------------------------------- */
+
   script.src =
 
     API_URL +
 
     "?action=" +
 
-    encodeURIComponent(action) +
+    encodeURIComponent(
+      action
+    ) +
 
     "&code=" +
 
-    encodeURIComponent(qrCode) +
+    encodeURIComponent(
+      qrCode
+    ) +
 
     "&callback=" +
 
-    encodeURIComponent(callbackName) +
+    encodeURIComponent(
+      callbackName
+    ) +
 
     "&t=" +
 
     Date.now();
 
 
+  /* ---------------------------------------------
+     NETWORK ERROR
+  --------------------------------------------- */
+
   script.onerror =
     function() {
 
 
-      clearTimeout(timeout);
+      clearTimeout(
+        timeout
+      );
 
 
-      if (script.parentNode) {
+      if (
+        script.parentNode
+      ) {
 
         script.parentNode.removeChild(
           script
@@ -885,13 +1177,19 @@ function callApi(
     };
 
 
+  /* ---------------------------------------------
+     TIMEOUT
+  --------------------------------------------- */
+
   timeout =
     setTimeout(
 
       function() {
 
 
-        if (script.parentNode) {
+        if (
+          script.parentNode
+        ) {
 
           script.parentNode.removeChild(
             script
@@ -909,6 +1207,7 @@ function callApi(
           "서버 응답 시간이 초과되었습니다."
         );
 
+
       },
 
       15000
@@ -924,13 +1223,17 @@ function callApi(
 
 
 /* =====================================================
-   NEXT PERSON
+   8. NEXT PERSON
 ===================================================== */
 
 function restartScanner() {
 
-  if (scannerRunning) {
+  if (
+    scannerRunning
+  ) {
+
     return;
+
   }
 
 
@@ -960,11 +1263,46 @@ function restartScanner() {
     "카메라를 다시 시작하고 있습니다...";
 
 
-  if (cameraPermissionGranted) {
+  /*
+    처음 선택했던 Camera ID가 있으므로
+    권한을 다시 요청할 필요 없이
+    같은 카메라를 다시 사용합니다.
+  */
 
-    startScanner();
+  if (
+    selectedCameraId
+  ) {
+
+    startScanner()
+
+      .catch(function(error) {
+
+
+        document.getElementById(
+          "status"
+        ).innerHTML =
+
+          '<div class="error">' +
+
+          '카메라를 다시 시작할 수 없습니다.' +
+
+          '<br><br>' +
+
+          escapeHtml(
+            String(error)
+          ) +
+
+          '</div>';
+
+      });
 
   }
+
+
+  /*
+    Camera ID가 없다면
+    처음부터 다시 시작
+  */
 
   else {
 
@@ -985,7 +1323,7 @@ function restartScanner() {
 
 
 /* =====================================================
-   ERROR
+   9. ERROR DISPLAY
 ===================================================== */
 
 function showError(message) {
@@ -1024,7 +1362,7 @@ function showError(message) {
 
 
 /* =====================================================
-   HTML ESCAPE
+   10. HTML ESCAPE
 ===================================================== */
 
 function escapeHtml(value) {
@@ -1036,11 +1374,16 @@ function escapeHtml(value) {
 
 
   div.textContent =
+
     String(
+
       value === undefined ||
       value === null
+
         ? ""
+
         : value
+
     );
 
 
@@ -1051,4 +1394,5 @@ function escapeHtml(value) {
 </script>
 
 </body>
+
 </html>
