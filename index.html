@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
+
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0">
 
@@ -37,28 +38,30 @@
       background: white;
       border-radius: 10px;
       min-height: 70px;
+      font-size: 18px;
+      line-height: 1.5;
     }
 
     .name {
-      font-size: 26px;
+      font-size: 30px;
       font-weight: bold;
       margin-bottom: 10px;
     }
 
-    .success {
-      font-size: 20px;
-      line-height: 1.6;
+    .id {
+      font-size: 18px;
     }
 
     .error {
-      font-size: 20px;
-      line-height: 1.5;
+      font-size: 18px;
     }
 
     button {
       margin-top: 15px;
-      padding: 12px 20px;
-      font-size: 16px;
+      padding: 14px 25px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
       cursor: pointer;
     }
   </style>
@@ -72,7 +75,7 @@
 <div id="reader"></div>
 
 <div id="result">
-  Point the camera at a QR code
+  Starting camera...
 </div>
 
 <button id="scanAgain"
@@ -85,7 +88,7 @@
 <script>
 
 /* =====================================================
-   GOOGLE APPS SCRIPT URL
+   GOOGLE APPS SCRIPT
 ===================================================== */
 
 const API_URL =
@@ -93,57 +96,47 @@ const API_URL =
 
 
 /* =====================================================
-   QR SCANNER
+   VARIABLES
 ===================================================== */
 
-const html5QrCode =
-  new Html5Qrcode(
-    "reader",
-    {
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.QR_CODE
-      ]
-    }
-  );
+const resultBox =
+  document.getElementById("result");
 
-let scanning = false;
+const scanAgainButton =
+  document.getElementById("scanAgain");
+
+const html5QrCode =
+  new Html5Qrcode("reader");
+
 let processing = false;
+let scannerRunning = false;
+let jsonpTimer = null;
 
 
 /* =====================================================
-   START CAMERA
+   START SCANNER
 ===================================================== */
 
 function startScanner() {
 
-  document.getElementById("result").innerHTML =
-    "Point the camera at a QR code";
+  processing = false;
 
-  document.getElementById("scanAgain").style.display =
+  scanAgainButton.style.display =
     "none";
 
-  processing = false;
+  resultBox.innerHTML =
+    "Starting camera...";
 
 
   const config = {
 
     fps: 15,
 
-    qrbox: function(viewfinderWidth, viewfinderHeight) {
-
-      const size =
-        Math.floor(
-          Math.min(
-            viewfinderWidth,
-            viewfinderHeight
-          ) * 0.7
-        );
-
-      return {
-        width: size,
-        height: size
-      };
+    qrbox: {
+      width: 250,
+      height: 250
     }
+
   };
 
 
@@ -157,31 +150,34 @@ function startScanner() {
 
     onScanSuccess,
 
-    function(errorMessage) {
-      // Normal scan failures are ignored.
+    function(scanError) {
+      // QR not detected yet.
+      // Keep scanning.
     }
 
   )
 
-  .then(() => {
+  .then(function() {
 
-    scanning = true;
+    scannerRunning = true;
+
+    resultBox.innerHTML =
+      "Point the camera at a QR code";
 
   })
 
-  .catch(error => {
+  .catch(function(error) {
 
-    document.getElementById("result").innerHTML =
+    scannerRunning = false;
 
+    resultBox.innerHTML =
       '<div class="error">' +
-
-      'Camera error:<br>' +
-
+      'Camera error:<br><br>' +
       escapeHtml(String(error)) +
-
       '</div>';
 
   });
+
 }
 
 
@@ -198,66 +194,64 @@ function onScanSuccess(decodedText) {
   processing = true;
 
 
-  document.getElementById("result").innerHTML =
-
-    "QR detected: " +
-
+  resultBox.innerHTML =
+    "QR detected: <strong>" +
     escapeHtml(decodedText) +
-
-    "<br><br>Looking up registration...";
+    "</strong><br><br>" +
+    "Stopping camera...";
 
 
   html5QrCode.stop()
 
-    .then(() => {
+  .then(function() {
 
-      scanning = false;
+    scannerRunning = false;
 
-      lookupPerson(decodedText);
+    lookupPerson(decodedText);
 
-    })
+  })
 
-    .catch(() => {
+  .catch(function() {
 
-      scanning = false;
+    scannerRunning = false;
 
-      lookupPerson(decodedText);
+    lookupPerson(decodedText);
 
-    });
+  });
+
 }
 
 
 /* =====================================================
-   LOOK UP PERSON USING JSONP
+   CONTACT APPS SCRIPT USING JSONP
 ===================================================== */
 
 function lookupPerson(id) {
 
-  /*
-    Remove an old JSONP script if one exists.
-  */
+  resultBox.innerHTML =
+    "QR detected: <strong>" +
+    escapeHtml(id) +
+    "</strong><br><br>" +
+    "Contacting database...";
+
+
+  /* Remove previous request */
 
   const oldScript =
-    document.getElementById("jsonpRequest");
+    document.getElementById("jsonp-script");
 
   if (oldScript) {
     oldScript.remove();
   }
 
 
-  /*
-    Create a new script element.
-
-    Example request:
-
-    /exec?id=2&callback=handleResult
-  */
+  /* Create JSONP request */
 
   const script =
     document.createElement("script");
 
   script.id =
-    "jsonpRequest";
+    "jsonp-script";
 
 
   script.src =
@@ -265,93 +259,86 @@ function lookupPerson(id) {
     "?id=" +
     encodeURIComponent(id) +
     "&callback=handleResult" +
-    "&_=" +
+    "&t=" +
     Date.now();
 
 
-  /*
-    If the Apps Script endpoint itself
-    cannot be loaded.
-  */
+  /* Network/load failure */
 
   script.onerror =
     function() {
 
-      document.getElementById("result").innerHTML =
+      clearTimeout(jsonpTimer);
 
+      resultBox.innerHTML =
         '<div class="error">' +
-
-        'Unable to contact registration database.' +
-
+        'Could not contact the database.' +
         '</div>';
 
-
-      document.getElementById("scanAgain")
-        .style.display =
+      scanAgainButton.style.display =
         "inline-block";
+
     };
 
 
+  /*
+     Timeout gives us a visible error if
+     Apps Script never calls handleResult().
+  */
+
+  jsonpTimer =
+    setTimeout(function() {
+
+      resultBox.innerHTML =
+        '<div class="error">' +
+        'Database request timed out.' +
+        '</div>';
+
+      scanAgainButton.style.display =
+        "inline-block";
+
+    }, 10000);
+
+
   document.body.appendChild(script);
+
 }
 
 
 /* =====================================================
-   APPS SCRIPT CALLBACK
-
-   Code.gs returns:
-
-   handleResult({...});
+   RESPONSE FROM APPS SCRIPT
 ===================================================== */
 
 function handleResult(person) {
 
-  const result =
-    document.getElementById("result");
+  clearTimeout(jsonpTimer);
 
 
   if (
-    person.success &&
-    person.found
+    person.success === true &&
+    person.found === true
   ) {
 
-    result.innerHTML =
+    resultBox.innerHTML =
 
       '<div class="name">' +
-
-      escapeHtml(
-        String(person.name)
-      ) +
-
+      escapeHtml(String(person.name)) +
       '</div>' +
 
-      '<div class="success">' +
-
+      '<div class="id">' +
       'ID: ' +
-
-      escapeHtml(
-        String(person.id)
-      ) +
-
-      '<br>' +
-
-      'Status: ' +
-
-      escapeHtml(
-        String(person.status)
-      ) +
-
+      escapeHtml(String(person.id)) +
       '</div>';
 
   }
 
 
   else if (
-    person.success &&
-    !person.found
+    person.success === true &&
+    person.found === false
   ) {
 
-    result.innerHTML =
+    resultBox.innerHTML =
 
       '<div class="error">' +
 
@@ -360,10 +347,7 @@ function handleResult(person) {
       '<br><br>' +
 
       'Scanned ID: ' +
-
-      escapeHtml(
-        String(person.id || "")
-      ) +
+      escapeHtml(String(person.id || "")) +
 
       '</div>';
 
@@ -372,7 +356,7 @@ function handleResult(person) {
 
   else {
 
-    result.innerHTML =
+    resultBox.innerHTML =
 
       '<div class="error">' +
 
@@ -388,12 +372,13 @@ function handleResult(person) {
       ) +
 
       '</div>';
+
   }
 
 
-  document.getElementById("scanAgain")
-    .style.display =
+  scanAgainButton.style.display =
     "inline-block";
+
 }
 
 
@@ -403,16 +388,17 @@ function handleResult(person) {
 
 function restartScanner() {
 
-  if (scanning) {
+  if (scannerRunning) {
     return;
   }
 
   startScanner();
+
 }
 
 
 /* =====================================================
-   ESCAPE HTML
+   SAFE TEXT DISPLAY
 ===================================================== */
 
 function escapeHtml(value) {
@@ -424,11 +410,12 @@ function escapeHtml(value) {
     value;
 
   return div.innerHTML;
+
 }
 
 
 /* =====================================================
-   START SCANNER
+   START
 ===================================================== */
 
 startScanner();
