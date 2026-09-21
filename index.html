@@ -3,17 +3,14 @@
 
 <head>
   <meta charset="UTF-8">
-
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0">
 
   <title>QR Check-in</title>
 
-  <!-- QR scanner library -->
   <script src="https://unpkg.com/html5-qrcode"></script>
 
   <style>
-
     body {
       font-family: Arial, sans-serif;
       max-width: 500px;
@@ -62,10 +59,8 @@
       font-size: 16px;
       cursor: pointer;
     }
-
   </style>
 </head>
-
 
 <body>
 
@@ -86,20 +81,17 @@
 
 <script>
 
-/* -------------------------------------------------
-   GOOGLE APPS SCRIPT WEB APP URL
-
-   Replace the URL below with your actual
-   Apps Script /exec URL.
--------------------------------------------------- */
+/* ------------------------------------------
+   GOOGLE APPS SCRIPT API
+------------------------------------------ */
 
 const API_URL =
   "https://script.google.com/macros/s/AKfycbwzYW7bofsuU2SDX7nTQ7y7I48blBtOB4dV1hjWOs2PI43jYyaXYLhu1lzbu3qq3xbN/exec";
 
 
-/* -------------------------------------------------
+/* ------------------------------------------
    QR SCANNER
--------------------------------------------------- */
+------------------------------------------ */
 
 const html5QrCode =
   new Html5Qrcode(
@@ -111,14 +103,13 @@ const html5QrCode =
     }
   );
 
-
 let scanning = false;
 let processing = false;
 
 
-/* -------------------------------------------------
+/* ------------------------------------------
    START CAMERA
--------------------------------------------------- */
+------------------------------------------ */
 
 function startScanner() {
 
@@ -149,7 +140,6 @@ function startScanner() {
         height: size
       };
     }
-
   };
 
 
@@ -164,16 +154,13 @@ function startScanner() {
     onScanSuccess,
 
     function(errorMessage) {
-      // Normal decoding failures are ignored.
-      // Scanner continues looking for a QR code.
+      // Normal scan failures are ignored.
     }
 
   )
 
   .then(() => {
-
     scanning = true;
-
   })
 
   .catch(error => {
@@ -181,21 +168,19 @@ function startScanner() {
     document.getElementById("result").innerHTML =
       '<div class="error">' +
       'Camera error:<br>' +
-      error +
+      escapeHtml(String(error)) +
       '</div>';
 
   });
-
 }
 
 
-/* -------------------------------------------------
-   QR CODE DETECTED
--------------------------------------------------- */
+/* ------------------------------------------
+   QR DETECTED
+------------------------------------------ */
 
 function onScanSuccess(decodedText) {
 
-  // Prevent the same QR from firing repeatedly
   if (processing) {
     return;
   }
@@ -204,11 +189,9 @@ function onScanSuccess(decodedText) {
 
   document.getElementById("result").innerHTML =
     "QR detected: " +
-    decodedText +
-    "<br>Looking up registration...";
+    escapeHtml(decodedText) +
+    "<br><br>Looking up registration...";
 
-
-  /* Stop camera after successful scan */
 
   html5QrCode.stop()
 
@@ -227,13 +210,12 @@ function onScanSuccess(decodedText) {
       lookupPerson(decodedText);
 
     });
-
 }
 
 
-/* -------------------------------------------------
+/* ------------------------------------------
    LOOK UP GOOGLE SHEET
--------------------------------------------------- */
+------------------------------------------ */
 
 async function lookupPerson(id) {
 
@@ -255,7 +237,6 @@ async function lookupPerson(id) {
         "Server response: " +
         response.status
       );
-
     }
 
 
@@ -277,22 +258,20 @@ async function lookupPerson(id) {
 
       '<br><br>' +
 
-      error.message +
+      escapeHtml(error.message) +
 
       '</div>';
 
 
     document.getElementById("scanAgain").style.display =
       "inline-block";
-
   }
-
 }
 
 
-/* -------------------------------------------------
-   DISPLAY RESULT
--------------------------------------------------- */
+/* ------------------------------------------
+   DISPLAY PERSON
+------------------------------------------ */
 
 function showResult(person) {
 
@@ -305,7 +284,7 @@ function showResult(person) {
     result.innerHTML =
 
       '<div class="name">' +
-      escapeHtml(person.name) +
+      escapeHtml(String(person.name)) +
       '</div>' +
 
       '<div class="success">' +
@@ -357,19 +336,17 @@ function showResult(person) {
       ) +
 
       '</div>';
-
   }
 
 
   document.getElementById("scanAgain").style.display =
     "inline-block";
-
 }
 
 
-/* -------------------------------------------------
-   SCAN ANOTHER PERSON
--------------------------------------------------- */
+/* ------------------------------------------
+   SCAN AGAIN
+------------------------------------------ */
 
 function restartScanner() {
 
@@ -378,13 +355,12 @@ function restartScanner() {
   }
 
   startScanner();
-
 }
 
 
-/* -------------------------------------------------
-   SECURITY - ESCAPE RETURNED TEXT
--------------------------------------------------- */
+/* ------------------------------------------
+   ESCAPE HTML
+------------------------------------------ */
 
 function escapeHtml(value) {
 
@@ -394,18 +370,16 @@ function escapeHtml(value) {
   div.textContent = value;
 
   return div.innerHTML;
-
 }
 
 
-/* -------------------------------------------------
-   START SCANNER WHEN PAGE LOADS
--------------------------------------------------- */
+/* ------------------------------------------
+   START AUTOMATICALLY
+------------------------------------------ */
 
 startScanner();
 
 </script>
 
 </body>
-
 </html>
