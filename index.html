@@ -1,37 +1,71 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
   <meta charset="UTF-8">
+
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0">
 
   <title>QR Check-in</title>
 
+  <!-- QR scanner library -->
   <script src="https://unpkg.com/html5-qrcode"></script>
 
   <style>
+
     body {
       font-family: Arial, sans-serif;
       max-width: 500px;
-      margin: 20px auto;
-      padding: 15px;
+      margin: 0 auto;
+      padding: 20px;
       text-align: center;
+      background: #f5f5f5;
+    }
+
+    h2 {
+      margin-bottom: 20px;
     }
 
     #reader {
       width: 100%;
-      margin-top: 20px;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
     }
 
     #result {
       margin-top: 20px;
-      padding: 15px;
-      background: #f2f2f2;
-      border-radius: 8px;
+      padding: 20px;
+      background: white;
+      border-radius: 10px;
+      min-height: 70px;
+    }
+
+    .name {
+      font-size: 26px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .success {
       font-size: 20px;
     }
+
+    .error {
+      font-size: 20px;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 12px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
   </style>
 </head>
+
 
 <body>
 
@@ -43,71 +77,335 @@
   Point the camera at a QR code
 </div>
 
+<button id="scanAgain"
+        onclick="restartScanner()"
+        style="display:none;">
+  Scan Again
+</button>
+
+
 <script>
 
-const resultBox = document.getElementById("result");
+/* -------------------------------------------------
+   GOOGLE APPS SCRIPT WEB APP URL
 
-const html5QrCode = new Html5Qrcode(
-  "reader",
-  {
-    formatsToSupport: [
-      Html5QrcodeSupportedFormats.QR_CODE
-    ]
-  }
-);
+   Replace the URL below with your actual
+   Apps Script /exec URL.
+-------------------------------------------------- */
 
-function onScanSuccess(decodedText, decodedResult) {
+const API_URL =
+  "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
 
-  resultBox.innerHTML =
-    "Scanned ID: <strong>" + decodedText + "</strong>";
 
-  // Stop scanning after successful read
-  html5QrCode.stop()
-    .then(() => {
-      console.log("Scanner stopped.");
-    })
-    .catch(err => {
-      console.log(err);
-    });
+/* -------------------------------------------------
+   QR SCANNER
+-------------------------------------------------- */
+
+const html5QrCode =
+  new Html5Qrcode(
+    "reader",
+    {
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.QR_CODE
+      ]
+    }
+  );
+
+
+let scanning = false;
+let processing = false;
+
+
+/* -------------------------------------------------
+   START CAMERA
+-------------------------------------------------- */
+
+function startScanner() {
+
+  document.getElementById("result").innerHTML =
+    "Point the camera at a QR code";
+
+  document.getElementById("scanAgain").style.display =
+    "none";
+
+  processing = false;
+
+  const config = {
+
+    fps: 15,
+
+    qrbox: function(viewfinderWidth, viewfinderHeight) {
+
+      const size =
+        Math.floor(
+          Math.min(
+            viewfinderWidth,
+            viewfinderHeight
+          ) * 0.7
+        );
+
+      return {
+        width: size,
+        height: size
+      };
+    }
+
+  };
+
+
+  html5QrCode.start(
+
+    {
+      facingMode: "environment"
+    },
+
+    config,
+
+    onScanSuccess,
+
+    function(errorMessage) {
+      // Normal decoding failures are ignored.
+      // Scanner continues looking for a QR code.
+    }
+
+  )
+
+  .then(() => {
+
+    scanning = true;
+
+  })
+
+  .catch(error => {
+
+    document.getElementById("result").innerHTML =
+      '<div class="error">' +
+      'Camera error:<br>' +
+      error +
+      '</div>';
+
+  });
+
 }
 
-const config = {
-  fps: 15,
 
-  qrbox: function(viewfinderWidth, viewfinderHeight) {
+/* -------------------------------------------------
+   QR CODE DETECTED
+-------------------------------------------------- */
 
-    const size =
-      Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7);
+function onScanSuccess(decodedText) {
 
-    return {
-      width: size,
-      height: size
-    };
-  },
-
-  aspectRatio: 1.0
-};
-
-html5QrCode.start(
-  {
-    facingMode: {
-      exact: "environment"
-    }
-  },
-  config,
-  onScanSuccess,
-  function(errorMessage) {
-    // Ignore normal scan failures while looking for QR
+  // Prevent the same QR from firing repeatedly
+  if (processing) {
+    return;
   }
-)
-.catch(err => {
 
-  resultBox.innerHTML =
-    "Camera error: " + err;
+  processing = true;
 
-});
+  document.getElementById("result").innerHTML =
+    "QR detected: " +
+    decodedText +
+    "<br>Looking up registration...";
+
+
+  /* Stop camera after successful scan */
+
+  html5QrCode.stop()
+
+    .then(() => {
+
+      scanning = false;
+
+      lookupPerson(decodedText);
+
+    })
+
+    .catch(() => {
+
+      scanning = false;
+
+      lookupPerson(decodedText);
+
+    });
+
+}
+
+
+/* -------------------------------------------------
+   LOOK UP GOOGLE SHEET
+-------------------------------------------------- */
+
+async function lookupPerson(id) {
+
+  try {
+
+    const url =
+      API_URL +
+      "?id=" +
+      encodeURIComponent(id);
+
+
+    const response =
+      await fetch(url);
+
+
+    if (!response.ok) {
+
+      throw new Error(
+        "Server response: " +
+        response.status
+      );
+
+    }
+
+
+    const person =
+      await response.json();
+
+
+    showResult(person);
+
+  }
+
+  catch (error) {
+
+    document.getElementById("result").innerHTML =
+
+      '<div class="error">' +
+
+      'Unable to retrieve registration.' +
+
+      '<br><br>' +
+
+      error.message +
+
+      '</div>';
+
+
+    document.getElementById("scanAgain").style.display =
+      "inline-block";
+
+  }
+
+}
+
+
+/* -------------------------------------------------
+   DISPLAY RESULT
+-------------------------------------------------- */
+
+function showResult(person) {
+
+  const result =
+    document.getElementById("result");
+
+
+  if (person.success && person.found) {
+
+    result.innerHTML =
+
+      '<div class="name">' +
+      escapeHtml(person.name) +
+      '</div>' +
+
+      '<div class="success">' +
+
+      'ID: ' +
+      escapeHtml(String(person.id)) +
+
+      '<br>' +
+
+      'Status: ' +
+      escapeHtml(String(person.status)) +
+
+      '</div>';
+
+  }
+
+  else if (person.success && !person.found) {
+
+    result.innerHTML =
+
+      '<div class="error">' +
+
+      'ID not found' +
+
+      '<br><br>' +
+
+      'Scanned ID: ' +
+      escapeHtml(String(person.id || "")) +
+
+      '</div>';
+
+  }
+
+  else {
+
+    result.innerHTML =
+
+      '<div class="error">' +
+
+      'Database error' +
+
+      '<br><br>' +
+
+      escapeHtml(
+        String(
+          person.message ||
+          "Unknown error"
+        )
+      ) +
+
+      '</div>';
+
+  }
+
+
+  document.getElementById("scanAgain").style.display =
+    "inline-block";
+
+}
+
+
+/* -------------------------------------------------
+   SCAN ANOTHER PERSON
+-------------------------------------------------- */
+
+function restartScanner() {
+
+  if (scanning) {
+    return;
+  }
+
+  startScanner();
+
+}
+
+
+/* -------------------------------------------------
+   SECURITY - ESCAPE RETURNED TEXT
+-------------------------------------------------- */
+
+function escapeHtml(value) {
+
+  const div =
+    document.createElement("div");
+
+  div.textContent = value;
+
+  return div.innerHTML;
+
+}
+
+
+/* -------------------------------------------------
+   START SCANNER WHEN PAGE LOADS
+-------------------------------------------------- */
+
+startScanner();
 
 </script>
 
 </body>
+
 </html>
