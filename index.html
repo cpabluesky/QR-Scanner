@@ -2240,14 +2240,12 @@ function localSearch(keyword, callback) {
    The Apps Script checkin handler must validate IDs and handle duplicate writes. */
 function localCheckIn(code, callback) { callApi('checkin',{code},callback); }
 function refreshRegistrations() {
-  const password = prompt('관리자 비밀번호를 입력하세요:');
-  if (password === null) return;
-  if (!password) return alert('비밀번호를 입력해 주세요.');
-  callApi('refresh', {password}, async function(data) {
+  callApi('refresh', {}, async function(data) {
     if (!data || data.success !== true) {
-      alert(data?.message || 'GitHub 명단 갱신에 실패했습니다.'); return;
+      alert(data?.message || 'GitHub 명단 갱신에 실패했습니다.');
+      return;
     }
-    // GitHub Pages may publish changes after a delay.
+    // GitHub Pages publication may lag behind the GitHub commit.
     await loadRegistrations();
     alert(`GitHub registrations.txt 갱신 완료 (${data.count}명). GitHub Pages 반영까지 수 분 걸릴 수 있습니다.`);
   });
