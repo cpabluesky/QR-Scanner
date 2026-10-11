@@ -2186,68 +2186,106 @@ function toggleSettings() {
   button.setAttribute('aria-expanded', String(!panel.hidden));
 }
 
-/* Registration reads from the GitHub Pages file, never Apps Script. */
-const REGISTRATION_FILE = './registrations.txt';
+/* Registration lookups use a CSV in the same GitHub Pages directory. */
+const REGISTRATION_FILE = './registrations.csv';
 let registrationList = [];
 let registrationLoaded = false;
 let registrationUpdated = '';
-function registrations() { return registrationList; }
+const registrationByCode = new Map();
+
 function refreshInfo() {
   document.getElementById('dataInfo').textContent = registrationLoaded
-    ? `등록자 ${registrationList.length}명 · 마지막 갱신: ${registrationUpdated || '정보 없음'}`
+    ? `등록자 ${registrationList.length}명 · CSV 확인: ${registrationUpdated}`
     : '등록자 명단을 불러오지 못했습니다.';
 }
+
+// RFC 4180-style CSV: handles quoted fields, commas, escaped quotes and newlines.
+function parseCSV(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const rows = [];
+  let row = [], field = '', quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else field += ch;
+    } else if (ch === '"' && field === '') quoted = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      if (row.some(x => x.trim() !== '')) rows.push(row);
+      row = [];
+    } else field += ch;
+  }
+  if (quoted) throw new Error('CSV 따옴표가 닫히지 않았습니다.');
+  row.push(field);
+  if (row.some(x => x.trim() !== '')) rows.push(row);
+  return rows;
+}
+
 async function loadRegistrations() {
-  registrationLoaded = false;
-  refreshInfo();
+  // Preserve a working list if a later refresh temporarily fails.
   try {
     const response = await fetch(REGISTRATION_FILE + '?v=' + Date.now(), {cache:'no-store'});
     if (!response.ok) throw new Error('HTTP ' + response.status);
-    const payload = await response.json();
-    const list = Array.isArray(payload) ? payload : payload.results;
-    if (!Array.isArray(list)) throw new Error('registrations.txt 형식이 올바르지 않습니다.');
-    const cleaned = list.map(p => ({
-      code:String(p.code ?? '').trim(), name:String(p.name ?? ''),
-      email:String(p.email ?? ''), phone:String(p.phone ?? ''),
-      gender:String(p.gender ?? ''), age:String(p.age ?? '')
-    })).filter(p => p.code);
-    if (new Set(cleaned.map(p => p.code)).size !== cleaned.length)
-      throw new Error('명단에 중복된 QR 고유번호가 있습니다.');
-    registrationList = cleaned;
-    registrationUpdated = payload.refreshedAt || '';
+    const rows = parseCSV(await response.text());
+    if (rows.length < 2) throw new Error('CSV에 헤더와 등록자 데이터가 필요합니다.');
+    const header = rows[0].map(x => x.trim().toLowerCase());
+    const columns = ['code', 'name', 'email', 'phone', 'gender', 'age'];
+    const positions = columns.map(c => header.indexOf(c));
+    if (positions[0] < 0 || positions[1] < 0)
+      throw new Error('CSV 첫 줄에 code,name 열이 있어야 합니다.');
+    const next = [], nextMap = new Map();
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      const p = {};
+      columns.forEach((c, j) => p[c] = positions[j] < 0 ? '' : String(r[positions[j]] ?? '').trim());
+      if (!p.code || !p.name) throw new Error(`CSV ${i + 1}행에 code 또는 name이 없습니다.`);
+      const key = p.code.toUpperCase();
+      if (nextMap.has(key)) throw new Error(`CSV에 중복 QR 코드가 있습니다: ${p.code}`);
+      nextMap.set(key, p);
+      next.push(p);
+    }
+    registrationList = next;
+    registrationByCode.clear();
+    nextMap.forEach((p, key) => registrationByCode.set(key, p));
     registrationLoaded = true;
+    registrationUpdated = new Date().toLocaleString('ko-KR');
     refreshInfo();
+    return true;
   } catch (error) {
-    registrationList = [];
     refreshInfo();
-    document.getElementById('status').textContent = '명단 파일을 읽을 수 없습니다: ' + error.message;
+    document.getElementById('status').textContent = 'CSV 명단을 읽을 수 없습니다: ' + error.message;
+    return false;
   }
 }
 function combinedPerson(person) {
   return {...person, alreadyCheckedIn:false, checkInTime:''};
 }
 function localLookup(code, callback) {
-  if (!registrationLoaded) return callback({success:false,message:'등록자 명단을 불러오지 못했습니다.'});
-  const p = registrations().find(p => p.code === String(code).trim());
+  if (!registrationLoaded) return callback({success:false,message:'등록자 CSV 명단을 불러오지 못했습니다.'});
+  const p = registrationByCode.get(String(code).trim().toUpperCase());
   callback(p ? {success:true,found:true,...combinedPerson(p)} : {success:true,found:false});
 }
 function localSearch(keyword, callback) {
-  if (!registrationLoaded) return callback({success:false,message:'등록자 명단을 불러오지 못했습니다.'});
-  const results = registrations().filter(p => p.name.toLocaleLowerCase().includes(keyword.toLocaleLowerCase())).map(combinedPerson);
+  if (!registrationLoaded) return callback({success:false,message:'등록자 CSV 명단을 불러오지 못했습니다.'});
+  const query = keyword.trim().toLocaleLowerCase();
+  const results = registrationList.filter(p => p.name.toLocaleLowerCase().includes(query)).map(combinedPerson);
   callback({success:true,found:results.length>0,results});
 }
-/* Check-in remains a server-side action, NOT a registration lookup.
-   The Apps Script checkin handler must validate IDs and handle duplicate writes. */
+// Check-in is still written to Google Sheets through Apps Script.
 function localCheckIn(code, callback) { callApi('checkin',{code},callback); }
 function refreshRegistrations() {
   callApi('refresh', {}, async function(data) {
     if (!data || data.success !== true) {
-      alert(data?.message || 'GitHub 명단 갱신에 실패했습니다.');
+      alert(data?.message || 'GitHub CSV 명단 갱신에 실패했습니다.');
       return;
     }
-    // GitHub Pages publication may lag behind the GitHub commit.
-    await loadRegistrations();
-    alert(`GitHub registrations.txt 갱신 완료 (${data.count}명). GitHub Pages 반영까지 수 분 걸릴 수 있습니다.`);
+    const loaded = await loadRegistrations();
+    alert(`GitHub registrations.csv 갱신 완료 (${data.count}명).` +
+      (loaded ? '' : ' GitHub Pages 배포 반영까지 수 분 걸릴 수 있습니다.'));
   });
 }
 refreshInfo();
