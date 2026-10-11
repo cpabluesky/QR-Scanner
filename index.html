@@ -2232,22 +2232,29 @@ async function loadRegistrations() {
     if (!response.ok) throw new Error('HTTP ' + response.status);
     const rows = parseCSV(await response.text());
     if (rows.length < 2) throw new Error('CSV에 헤더와 등록자 데이터가 필요합니다.');
-    const header = rows[0].map(x => x.trim().toLowerCase());
-    const columns = ['code', 'name', 'email', 'phone', 'gender', 'age'];
-    const positions = columns.map(c => header.indexOf(c));
-    if (positions[0] < 0 || positions[1] < 0)
-      throw new Error('CSV 첫 줄에 code,name 열이 있어야 합니다.');
+    // Keep the original Google Forms headers and read by fixed column position.
+    // A timestamp, B name, C email, D phone, E gender, F age, K QR code.
+    if (rows[0].length < 11) throw new Error('CSV에 K열(QR 코드)이 없습니다.');
     const next = [], nextMap = new Map();
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
-      const p = {};
-      columns.forEach((c, j) => p[c] = positions[j] < 0 ? '' : String(r[positions[j]] ?? '').trim());
-      if (!p.code || !p.name) throw new Error(`CSV ${i + 1}행에 code 또는 name이 없습니다.`);
+      const name = String(r[1] ?? '').trim();
+      if (!name) continue;
+      const p = {
+        code: String(r[10] ?? '').trim(),
+        name,
+        email: String(r[2] ?? '').trim(),
+        phone: String(r[3] ?? '').trim(),
+        gender: String(r[4] ?? '').trim(),
+        age: String(r[5] ?? '').trim()
+      };
+      if (!p.code) throw new Error(`CSV ${i + 1}행의 K열에 QR 코드가 없습니다.`);
       const key = p.code.toUpperCase();
       if (nextMap.has(key)) throw new Error(`CSV에 중복 QR 코드가 있습니다: ${p.code}`);
       nextMap.set(key, p);
       next.push(p);
     }
+    if (!next.length) throw new Error('CSV에 유효한 등록자가 없습니다.');
     registrationList = next;
     registrationByCode.clear();
     nextMap.forEach((p, key) => registrationByCode.set(key, p));
