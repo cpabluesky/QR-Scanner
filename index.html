@@ -300,9 +300,6 @@
 <div id="dataControls" hidden style="background:white;padding:12px;border-radius:10px;margin-bottom:15px;text-align:left">
   <div id="dataInfo" style="font-size:13px;line-height:1.6">저장된 명단을 확인하고 있습니다.</div>
   <button type="button" onclick="refreshRegistrations()" style="font-size:15px;background:#5b3b8c;color:white">관리자: 명단 새로고침</button>
-  <button type="button" onclick="downloadBackups()" style="font-size:14px;background:#eee">명단·입장기록 TXT 백업</button>
-  <button type="button" onclick="document.getElementById('restoreStatusFile').click()" style="font-size:14px;background:#eee">입장기록 TXT 복원</button>
-  <input id="restoreStatusFile" type="file" accept=".txt,.json" style="display:none" onchange="restoreStatus(event)">
 </div>
 
 
@@ -2227,6 +2224,7 @@ function localCheckIn(code, callback) {
   try { localStorage.setItem(STATUS_KEY, JSON.stringify(state)); }
   catch (e) { return callback({success:false,message:'입장기록 저장 실패: '+e.message}); }
   refreshInfo();
+  downloadText('checkin_status.txt', state);
   callback({success:true,found:true,alreadyCheckedIn:false,checkInTime});
 }
 function refreshRegistrations() {
@@ -2249,7 +2247,9 @@ function refreshRegistrations() {
       localStorage.setItem(SYNC_KEY, new Date().toLocaleString('en-AU'));
     } catch (e) { return alert('명단 저장 실패: '+e.message); }
     // STATUS_KEY is deliberately untouched.
-    refreshInfo(); alert(`${list.length}명의 명단을 새로고침했습니다. 입장기록은 유지됐습니다.`);
+    refreshInfo();
+    downloadText('registrations.txt', {refreshedAt:localStorage.getItem(SYNC_KEY),results:list});
+    alert(`${list.length}명의 명단을 새로고침했습니다. registrations.txt를 다운로드했습니다. 입장기록은 유지됐습니다.`);
   });
 }
 function downloadText(filename, data) {
