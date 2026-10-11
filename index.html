@@ -282,6 +282,11 @@
       cursor: default;
     }
 
+    .topbar { position:relative; display:flex; align-items:center; justify-content:center; min-height:62px; margin-bottom:12px; }
+    .topbar h2 { margin:10px 0; }
+    #settingsToggle { position:absolute; right:0; top:50%; transform:translateY(-50%); width:auto; margin:0; padding:8px 10px; border:0; background:transparent; color:#5b3b8c; font-size:14px; font-weight:600; }
+    #settingsToggle:hover, #settingsToggle:focus-visible { text-decoration:underline; }
+    #dataControls[hidden] { display:none !important; }
   </style>
 
 </head>
@@ -291,7 +296,14 @@
 
 <div class="container">
 
-  <h2>입장 확인</h2>
+  <div class="topbar"><h2>입장 확인</h2><button id="settingsToggle" type="button" aria-expanded="false" aria-controls="dataControls" onclick="toggleSettings()">설정 <span aria-hidden="true">⚙</span></button></div>
+<div id="dataControls" hidden style="background:white;padding:12px;border-radius:10px;margin-bottom:15px;text-align:left">
+  <div id="dataInfo" style="font-size:13px;line-height:1.6">저장된 명단을 확인하고 있습니다.</div>
+  <button type="button" onclick="refreshRegistrations()" style="font-size:15px;background:#5b3b8c;color:white">관리자: 명단 새로고침</button>
+  <button type="button" onclick="downloadBackups()" style="font-size:14px;background:#eee">명단·입장기록 TXT 백업</button>
+  <button type="button" onclick="document.getElementById('restoreStatusFile').click()" style="font-size:14px;background:#eee">입장기록 TXT 복원</button>
+  <input id="restoreStatusFile" type="file" accept=".txt,.json" style="display:none" onchange="restoreStatus(event)">
+</div>
 
 
   <!-- =================================================
@@ -862,15 +874,7 @@ function onScanSuccess(decodedText) {
 
 function lookupPerson(qrCode) {
 
-  callApi(
-
-    "lookup",
-
-    {
-      code: qrCode
-    },
-
-    function(data) {
+  localLookup(qrCode, function(data) {
 
 
       if (
@@ -1117,15 +1121,7 @@ function searchByName() {
     "검색하고 있습니다...";
 
 
-  callApi(
-
-    "search",
-
-    {
-      keyword: keyword
-    },
-
-    function(data) {
+  localSearch(keyword, function(data) {
 
 
       button.disabled =
@@ -1565,15 +1561,7 @@ function confirmCheckIn() {
     "입장 처리 중...";
 
 
-  callApi(
-
-    "checkin",
-
-    {
-      code: currentQRCode
-    },
-
-    function(data) {
+  localCheckIn(currentQRCode, function(data) {
 
 
       if (
@@ -2192,6 +2180,103 @@ function escapeHtml(value) {
   return div.innerHTML;
 
 }
+
+
+function toggleSettings() {
+  const panel = document.getElementById('dataControls');
+  const button = document.getElementById('settingsToggle');
+  panel.hidden = !panel.hidden;
+  button.setAttribute('aria-expanded', String(!panel.hidden));
+}
+
+/* Local registration cache and independent attendance status.
+   Storage is per browser/profile. Back up TXT files and restore on another device. */
+const REG_KEY = 'checkin_registrations_v1';
+const STATUS_KEY = 'checkin_status_v1';
+const SYNC_KEY = 'checkin_last_refresh_v1';
+function readStore(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+  catch (_) { return fallback; }
+}
+function registrations() { return readStore(REG_KEY, []); }
+function attendance() { return readStore(STATUS_KEY, {}); }
+function refreshInfo() {
+  const time = localStorage.getItem(SYNC_KEY);
+  document.getElementById('dataInfo').textContent =
+    `등록자 ${registrations().length}명 · 마지막 명단 갱신: ${time || '없음'} · 입장기록 ${Object.keys(attendance()).length}건`;
+}
+function combinedPerson(person) {
+  const state = attendance()[String(person.code).trim()];
+  return {...person, alreadyCheckedIn: !!state, checkInTime: state?.checkInTime || ''};
+}
+function localLookup(code, callback) {
+  const p = registrations().find(p => String(p.code).trim() === String(code).trim());
+  callback(p ? {success:true, found:true, ...combinedPerson(p)} : {success:true, found:false});
+}
+function localSearch(keyword, callback) {
+  const results = registrations().filter(p => String(p.name || '').toLocaleLowerCase().includes(keyword.toLocaleLowerCase())).map(combinedPerson);
+  callback({success:true, found:results.length>0, results});
+}
+function localCheckIn(code, callback) {
+  const p = registrations().find(p => String(p.code).trim() === String(code).trim());
+  if (!p) return callback({success:true, found:false});
+  const state = attendance();
+  if (state[code]) return callback({success:true,found:true,alreadyCheckedIn:true,checkInTime:state[code].checkInTime});
+  const checkInTime = new Date().toLocaleString('en-AU', {dateStyle:'short',timeStyle:'medium'});
+  state[code] = {checkedIn:true,checkInTime,updatedAt:new Date().toISOString()};
+  try { localStorage.setItem(STATUS_KEY, JSON.stringify(state)); }
+  catch (e) { return callback({success:false,message:'입장기록 저장 실패: '+e.message}); }
+  refreshInfo();
+  callback({success:true,found:true,alreadyCheckedIn:false,checkInTime});
+}
+function refreshRegistrations() {
+  const password = prompt('명단 새로고침 관리자 비밀번호:');
+  if (password === null) return;
+  if (!password) return alert('비밀번호를 입력해 주세요.');
+  // Authentication MUST occur on the server. Never store a password in HTML.
+  callApi('refresh', {password}, function(data) {
+    if (!data || data.success !== true || !Array.isArray(data.results)) {
+      alert(data?.message || '명단 새로고침 실패'); return;
+    }
+    const list = data.results.map(p => ({
+      code:String(p.code || '').trim(), name:String(p.name || ''),
+      email:String(p.email || ''),phone:String(p.phone || ''),
+      gender:String(p.gender || ''),age:String(p.age || '')
+    })).filter(p => p.code);
+    if (new Set(list.map(p=>p.code)).size !== list.length) return alert('중복된 등록 ID가 있어 갱신을 취소했습니다.');
+    try {
+      localStorage.setItem(REG_KEY, JSON.stringify(list));
+      localStorage.setItem(SYNC_KEY, new Date().toLocaleString('en-AU'));
+    } catch (e) { return alert('명단 저장 실패: '+e.message); }
+    // STATUS_KEY is deliberately untouched.
+    refreshInfo(); alert(`${list.length}명의 명단을 새로고침했습니다. 입장기록은 유지됐습니다.`);
+  });
+}
+function downloadText(filename, data) {
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function downloadBackups() {
+  downloadText('registrations.txt',{refreshedAt:localStorage.getItem(SYNC_KEY),results:registrations()});
+  downloadText('checkin_status.txt',attendance());
+}
+function restoreStatus(event) {
+  const file=event.target.files?.[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try {
+      const data=JSON.parse(reader.result);
+      if (!data || typeof data!=='object' || Array.isArray(data)) throw Error('Invalid format');
+      if (!confirm('기존 입장기록을 복원 파일로 교체하시겠습니까?')) return;
+      localStorage.setItem(STATUS_KEY,JSON.stringify(data)); refreshInfo(); alert('입장기록을 복원했습니다.');
+    } catch(e) { alert('복원 실패: '+e.message); }
+    finally { event.target.value=''; }
+  };
+  reader.readAsText(file);
+}
+refreshInfo();
 
 </script>
 
