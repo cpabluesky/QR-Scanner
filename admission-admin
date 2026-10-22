@@ -1,0 +1,10 @@
+#!/bin/sh
+# Launch the local Textual CLI using this project's isolated Python environment.
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
+if [ ! -x "$SCRIPT_DIR/.venv/bin/python" ]; then
+  echo '먼저 프로젝트 폴더에서 설치해 주세요:' >&2
+  echo 'python3 -m venv .venv' >&2
+  echo '.venv/bin/python -m pip install -r requirements-cli.txt' >&2
+  exit 1
+fi
+exec "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/admission_cli.py" "$@"

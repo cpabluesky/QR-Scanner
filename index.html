@@ -315,6 +315,7 @@
     </div>
     <progress id="admissionProgress" max="100" value="0" aria-label="등록자 대비 입장률"></progress>
     <p id="admissionStatsMessage" role="status"></p>
+    <button type="button" onclick="closeAdmissionStatistics()">현황정보 닫기</button>
   </section>
 
 
@@ -2021,6 +2022,13 @@ function toggleAdmissionStatistics() {
   panel.hidden = !panel.hidden;
   button.setAttribute('aria-expanded', String(!panel.hidden));
   if (!panel.hidden) refreshAdmissionStatistics();
+}
+
+function closeAdmissionStatistics() {
+  document.getElementById('admissionStatistics').hidden = true;
+  const button = document.getElementById('admissionStatsToggle');
+  button.setAttribute('aria-expanded', 'false');
+  button.focus();
 }
 
 /* Registration lookups use a CSV in the same GitHub Pages directory. */
