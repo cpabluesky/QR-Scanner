@@ -9,6 +9,9 @@
 
   <!-- QR Scanner Library -->
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./supabase-config.js"></script>
+  <script src="./admission-store.js"></script>
 
   <style>
 
@@ -287,6 +290,7 @@
     #settingsToggle { position:absolute; right:0; top:50%; transform:translateY(-50%); width:auto; margin:0; padding:8px 10px; border:0; background:transparent; color:#5b3b8c; font-size:14px; font-weight:600; }
     #settingsToggle:hover, #settingsToggle:focus-visible { text-decoration:underline; }
     #dataControls[hidden] { display:none !important; }
+    #databaseMessage { font-size:14px; white-space:pre-wrap; }
   </style>
 
 </head>
@@ -297,6 +301,7 @@
 <div class="container">
 
   <div class="topbar"><h2>입장 확인</h2><button id="settingsToggle" type="button" aria-expanded="false" aria-controls="dataControls" onclick="toggleSettings()">설정 <span aria-hidden="true">⚙</span></button></div>
+  <p id="databaseMessage" role="status">입장 DB 연결 설정을 확인하고 있습니다.</p>
 <div id="dataControls" hidden style="background:white;padding:12px;border-radius:10px;margin-bottom:15px;text-align:left">
   <div id="dataInfo" style="font-size:13px;line-height:1.6">저장된 명단을 확인하고 있습니다.</div>
   <button type="button" onclick="refreshRegistrations()" style="font-size:15px;background:#5b3b8c;color:white">명단 새로고침</button>
@@ -521,6 +526,9 @@ const html5QrCode =
 
 function requestCamera() {
 
+  if (!admissionsConfigured) return alert('입장 DB 연결 설정을 확인해 주세요.');
+  admissionViewVersion++;
+
   currentMode = "scan";
 
 
@@ -670,6 +678,8 @@ function requestCamera() {
 
 function startScanner() {
 
+  if (!admissionsConfigured) return Promise.reject(new Error('입장 DB 연결 설정을 확인해 주세요.'));
+
   if (!selectedCameraId) {
 
     return Promise.reject(
@@ -795,6 +805,8 @@ function startScanner() {
 
 function onScanSuccess(decodedText) {
 
+  if (!admissionsConfigured) return;
+
   if (processing) {
 
     return;
@@ -870,8 +882,10 @@ function onScanSuccess(decodedText) {
 ===================================================== */
 
 function lookupPerson(qrCode) {
+  const version = ++admissionViewVersion;
 
   localLookup(qrCode, function(data) {
+      if (version !== admissionViewVersion) return;
 
 
       if (
@@ -939,6 +953,10 @@ function lookupPerson(qrCode) {
 ===================================================== */
 
 function openNameSearch() {
+
+  if (!admissionsConfigured) return alert('입장 DB 연결 설정을 확인해 주세요.');
+  admissionViewVersion++;
+  visibleSearchResults = [];
 
   currentMode =
     "search";
@@ -1066,6 +1084,8 @@ function handleSearchKey(event) {
 ===================================================== */
 
 function searchByName() {
+  const version = ++admissionViewVersion;
+  visibleSearchResults = [];
 
   const input =
     document.getElementById(
@@ -1119,6 +1139,7 @@ function searchByName() {
 
 
   localSearch(keyword, function(data) {
+      if (version !== admissionViewVersion) return;
 
 
       button.disabled =
@@ -1193,6 +1214,7 @@ function searchByName() {
 ===================================================== */
 
 function displaySearchResults(results) {
+  visibleSearchResults = results;
 
   const resultsArea =
     document.getElementById(
@@ -1397,9 +1419,8 @@ function selectSearchResult(person) {
     "none";
 
 
-  displayPerson(
-    person
-  );
+  // A different device may have admitted this person since the search completed.
+  lookupPerson(currentQRCode);
 
 }
 
@@ -1537,12 +1558,14 @@ function displayPerson(person) {
 
 function confirmCheckIn() {
 
-  if (!currentQRCode) {
+  if (!currentQRCode || checkInPending) {
 
     return;
 
   }
 
+  const version = ++admissionViewVersion;
+  checkInPending = true;
 
   const button =
     document.getElementById(
@@ -1559,6 +1582,8 @@ function confirmCheckIn() {
 
 
   localCheckIn(currentQRCode, function(data) {
+      checkInPending = false;
+      if (version !== admissionViewVersion) return;
 
 
       if (
@@ -1913,6 +1938,7 @@ function nextPerson() {
 ===================================================== */
 
 function restartScanner() {
+  admissionViewVersion++;
 
   currentMode =
     "scan";
@@ -2017,6 +2043,7 @@ function restartScanner() {
 ===================================================== */
 
 function backToScanner() {
+  admissionViewVersion++;
 
   currentMode =
     "scan";
@@ -2253,7 +2280,7 @@ async function loadRegistrations() {
         age: String(r[5] ?? '').trim()
       };
       if (!p.code) throw new Error(`CSV ${i + 1}행의 Qr_Codes 열에 QR 코드가 없습니다.`);
-      const key = p.code.toUpperCase();
+      const key = p.code;
       if (nextMap.has(key)) throw new Error(`CSV에 중복 QR 코드가 있습니다: ${p.code}`);
       nextMap.set(key, p);
       next.push(p);
@@ -2272,22 +2299,109 @@ async function loadRegistrations() {
     return false;
   }
 }
-function combinedPerson(person) {
-  return {...person, alreadyCheckedIn:false, checkInTime:''};
+function formatAdmissionTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error('입장시간을 확인할 수 없습니다.');
+  return date.toLocaleString('ko-KR', {timeZone:'Australia/Sydney', timeZoneName:'short'});
+}
+function combinedPerson(person, state) {
+  return {...person, alreadyCheckedIn:state.status === 'checked_in',
+    checkInTime:formatAdmissionTime(state.checked_in_at)};
+}
+async function admissionRequest(work, callback) {
+  let result;
+  try {
+    if (!admissionStore || !admissionsConfigured) throw new Error('입장 DB 연결 설정을 확인해 주세요.');
+    result = await work();
+  } catch (error) {
+    result = {success:false, message:error.message || '입장 DB 연결에 실패했습니다. 다시 시도해 주세요.'};
+  }
+  callback(result);
 }
 function localLookup(code, callback) {
-  if (!registrationLoaded) return callback({success:false,message:'등록자 CSV 명단을 불러오지 못했습니다.'});
-  const p = registrationByCode.get(String(code).trim().toUpperCase());
-  callback(p ? {success:true,found:true,...combinedPerson(p)} : {success:true,found:false});
+  admissionRequest(async () => {
+    if (!registrationLoaded) throw new Error('등록자 CSV 명단을 불러오지 못했습니다.');
+    const p = registrationByCode.get(String(code).trim());
+    if (!p) return {success:true,found:false};
+    const states = await admissionStore.getStates([p.code]);
+    return {success:true,found:true,...combinedPerson(p, states.get(p.code))};
+  }, callback);
 }
 function localSearch(keyword, callback) {
-  if (!registrationLoaded) return callback({success:false,message:'등록자 CSV 명단을 불러오지 못했습니다.'});
-  const query = keyword.trim().toLocaleLowerCase();
-  const results = registrationList.filter(p => p.name.toLocaleLowerCase().includes(query)).map(combinedPerson);
-  callback({success:true,found:results.length>0,results});
+  admissionRequest(async () => {
+    if (!registrationLoaded) throw new Error('등록자 CSV 명단을 불러오지 못했습니다.');
+    const query = keyword.trim().toLocaleLowerCase();
+    const people = registrationList.filter(p => p.name.toLocaleLowerCase().includes(query));
+    const states = await admissionStore.getStates(people.map(p => p.code));
+    const results = people.map(p => combinedPerson(p, states.get(p.code)));
+    return {success:true,found:results.length>0,results};
+  }, callback);
 }
-// Check-in is still written to Google Sheets through Apps Script.
-function localCheckIn(code, callback) { callApi('checkin',{code},callback); }
+function localCheckIn(code, callback) {
+  admissionRequest(async () => {
+    const data = await admissionStore.checkIn(code);
+    return {...data, checkInTime:formatAdmissionTime(data.checkInTime)};
+  }, callback);
+}
+
+let admissionStore = null;
+let admissionClient = null;
+let admissionsConfigured = false;
+let admissionViewVersion = 0;
+let visibleSearchResults = [];
+let admissionSyncBusy = false;
+let checkInPending = false;
+
+async function refreshVisibleAdmissions() {
+  if (!admissionsConfigured || admissionSyncBusy || checkInPending || document.hidden) return;
+  const version = admissionViewVersion;
+  const cardVisible = document.getElementById('personCard').style.display === 'block';
+  const searchVisible = document.getElementById('nameSearchArea').style.display === 'block';
+  const people = cardVisible
+    ? [registrationByCode.get(currentQRCode)].filter(Boolean)
+    : searchVisible ? visibleSearchResults : [];
+  if (!people.length) return;
+  admissionSyncBusy = true;
+  try {
+    const states = await admissionStore.getStates(people.map(p => p.code));
+    if (version !== admissionViewVersion || checkInPending) return;
+    const updated = people.map(p => combinedPerson(p, states.get(p.code)));
+    if (cardVisible) displayPerson(updated[0]);
+    else displaySearchResults(updated);
+    document.getElementById('databaseMessage').textContent = '입장 상태 동기화됨 · ' +
+      new Date().toLocaleTimeString('ko-KR', {timeZone:'Australia/Sydney'});
+  } catch (error) {
+    if (version !== admissionViewVersion) return;
+    document.getElementById('databaseMessage').textContent =
+      '입장 상태를 동기화하지 못했습니다. 연결을 확인해 주세요. · ' + error.message;
+    if (cardVisible) document.getElementById('checkInButton').disabled = true;
+  } finally {
+    admissionSyncBusy = false;
+  }
+}
+function initializeAdmissions() {
+  const config = window.SUPABASE_CONFIG || {};
+  const message = document.getElementById('databaseMessage');
+  try {
+    if (!config.url || !config.publishableKey) throw new Error('Supabase 연결 설정이 필요합니다. 관리자에게 문의해 주세요.');
+    if (!window.supabase) throw new Error('입장 DB 연결 프로그램을 불러오지 못했습니다. 페이지를 새로고침해 주세요.');
+    admissionClient = window.supabase.createClient(config.url, config.publishableKey, {
+      auth: {persistSession:false, autoRefreshToken:false, detectSessionInUrl:false}
+    });
+    admissionStore = window.createAdmissionStore(admissionClient);
+    admissionsConfigured = true;
+    message.textContent = '입장 상태 자동 동기화 · 5초 간격';
+    window.setInterval(refreshVisibleAdmissions, 5000);
+    window.addEventListener('focus', refreshVisibleAdmissions);
+    document.addEventListener('visibilitychange', refreshVisibleAdmissions);
+  } catch (error) {
+    message.textContent = error.message;
+  }
+  for (const id of ['cameraStartButton', 'nameSearchButton', 'scannerNameSearchButton']) {
+    document.getElementById(id).disabled = !admissionsConfigured;
+  }
+}
 function refreshRegistrations() {
   callApi('refresh', {}, async function(data) {
     if (!data || data.success !== true) {
@@ -2301,6 +2415,7 @@ function refreshRegistrations() {
 }
 refreshInfo();
 loadRegistrations();
+initializeAdmissions();
 </script>
 
 </body>
