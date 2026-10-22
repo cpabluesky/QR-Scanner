@@ -161,6 +161,60 @@ test('Visible cards sync other-device admission, recover from errors and discard
     store,state,assert);
 });
 
+test('Statistics use all registered barcodes and search matches name, phone and email fragments', async () => {
+  const {store,state} = fakeClient();
+  const elements = new Map();
+  const document = {hidden:false,getElementById(id) {
+    if (!elements.has(id)) elements.set(id,{style:{},textContent:'',hidden:false});
+    return elements.get(id);
+  }};
+  const runPage = new Function('window','document','Html5Qrcode','fetch',
+    'store','state','assert', PAGE_SCRIPT + `
+      return (async () => {
+        await loadRegistrations();
+        admissionStore = store; admissionsConfigured = true;
+        assert(registrationList.length === 401);
+        state.rows = registrationList.map((p,i) => ({bar_code:p.code,
+          status:i < 100 ? 'checked_in' : 'pending',
+          checked_in_at:i < 100 ? '2026-10-22T11:00:00Z' : null}));
+        await refreshAdmissionStatistics();
+        assert(document.getElementById('admissionStatsCount').textContent === '100명 / 401명 입장');
+        assert(document.getElementById('admissionStatsPercentage').textContent === '입장률 24.9%');
+        assert(Math.abs(document.getElementById('admissionProgress').value - 100/401*100) < 0.001);
+        state.error = {message:'Network unavailable'};
+        await refreshAdmissionStatistics();
+        assert(document.getElementById('admissionStatsMessage').textContent.includes('확인하지 못했습니다'));
+        assert(document.getElementById('admissionStatsCount').textContent === '100명 / 401명 입장');
+        state.error = null;
+        for (const row of state.rows) { row.status = 'pending'; row.checked_in_at = null; }
+        await refreshAdmissionStatistics();
+        assert(document.getElementById('admissionStatsPercentage').textContent === '입장률 0.0%');
+        for (const row of state.rows) { row.status = 'checked_in'; row.checked_in_at = '2026-10-22T11:00:00Z'; }
+        await refreshAdmissionStatistics();
+        assert(document.getElementById('admissionStatsPercentage').textContent === '입장률 100.0%');
+        document.getElementById('admissionStatistics').hidden = true;
+        const reads = state.reads.length;
+        await refreshAdmissionStatistics();
+        assert(state.reads.length === reads);
+        registrationList = [
+          {code:'A',name:'Alice',phone:'0401 239 857',email:'first@example.com'},
+          {code:'B',name:'Bob',phone:'0499000000',email:'alice@OTHER.org'},
+          {code:'C',name:'승현',phone:'0411-222-333',email:'other@example.net'}
+        ];
+        state.rows = registrationList.map(p => ({bar_code:p.code,status:'pending',checked_in_at:null}));
+        const search = q => new Promise(resolve => localSearch(q,resolve));
+        assert((await search('ALICE')).results.map(p=>p.code).join(',') === 'A,B');
+        assert((await search('401239')).results[0].code === 'A');
+        assert((await search('0411222')).results[0].code === 'C');
+        assert((await search('@other.ORG')).results[0].code === 'B');
+        assert((await search('승')).results[0].code === 'C');
+        assert(!(await search('   ')).found);
+        assert(!(await search('no matching person')).found);
+      })();`);
+  await runPage({},document,function(){},async () => ({ok:true,text:async () => TEST_CSV}),
+    store,state,assert);
+});
+
 globalThis.testResult = null;
 (async () => {
   const passed = [];

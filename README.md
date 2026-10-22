@@ -6,10 +6,14 @@ QR Scanner - For 2026 Dharma Talk
 Registration details remain in `registrations.csv`. Admission state is shared in
 Supabase, so multiple devices can read and check in at the same time. Visitors
 do not need a Supabase account or an app login.
-Visible registration cards and name-search results refresh from the DB every
+Visible registration cards and search results refresh from the DB every
 five seconds while the page is visible, and when the window regains focus.
 Scanning, searching, and choosing a search result also read current DB status.
 Check-in always uses the atomic DB function, regardless of the last refresh.
+The top-right 입장현황 panel shows the admitted count, registered count (currently
+401), and percentage, refreshing every five seconds while open. Search matches
+case-insensitive fragments anywhere in name, phone, or email, including phone
+digits across spaces and hyphens.
 
 1. Run [`supabase-setup.sql`](supabase-setup.sql) in your project's SQL Editor.
    It creates the table/function, or switches the earlier staff-only setup to
@@ -71,10 +75,10 @@ Node.js or macOS JavaScriptCore. Also verify against the actual Supabase project
   Reconnect and scan again to resolve requests that may have reached the DB.
 - Check that direct public INSERT, UPDATE, and DELETE requests are denied.
 
-Check-in no longer calls Google Apps Script. The separate “명단 새로고침” action
-still uses the existing Apps Script to refresh the registration CSV; its export
-must preserve `Qr_Codes`. New registration codes must also be imported into
-Supabase before admission. CSV changes do not reset DB admission state.
+The app no longer calls Google Apps Script. Update the registration CSV in the
+repository to change the registration list and preserve its `Qr_Codes` column.
+New registration codes must also be imported into Supabase before admission.
+CSV changes do not reset DB admission state.
 
 If a registration exists in CSV but not DB, the app reports an error rather than
 assuming the person is not yet admitted. Check configuration in
