@@ -437,6 +437,11 @@
 
 
     <div class="row">
+      <div class="label">바코드 식별번호</div>
+      <div id="personRegistrationId" class="value"></div>
+    </div>
+
+    <div class="row">
 
       <div class="label">
         전화번호
@@ -1299,7 +1304,9 @@ function displaySearchResults(results) {
 
           person.gender || "",
 
-          person.age || ""
+          person.age || "",
+
+          person.registrationId ? "바코드 식별번호: " + person.registrationId : ""
 
         ]
 
@@ -1432,6 +1439,9 @@ function selectSearchResult(person) {
 ===================================================== */
 
 function displayPerson(person) {
+
+  document.getElementById('personRegistrationId').textContent =
+    person.registrationId || '';
 
   document.getElementById(
     "scannerSearchArea"
@@ -2077,6 +2087,7 @@ async function loadRegistrations() {
       header.trim().toLowerCase().replace(/[\s_]/g, '') === 'qrcodes'
     );
     if (qrCodeColumn === -1) throw new Error('CSV에 Qr_Codes 열이 없습니다.');
+    const registrationIdColumn = rows[0].findIndex(header => header.trim() === '고유번호');
     const next = [], nextMap = new Map();
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
@@ -2084,6 +2095,7 @@ async function loadRegistrations() {
       if (!name) continue;
       const p = {
         code: String(r[qrCodeColumn] ?? '').trim(),
+        registrationId: String(r[registrationIdColumn] ?? '').trim(),
         name,
         email: String(r[2] ?? '').trim(),
         phone: String(r[3] ?? '').trim(),
