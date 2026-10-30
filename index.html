@@ -301,10 +301,15 @@
     .roster-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
     .roster-header h3 { margin:0; }
     #closeAdmissionRoster { width:auto; margin:0; background:#eee; color:#222; }
-    .roster-scroll { max-height:70vh; overflow-y:auto; border:1px solid #ddd; border-radius:8px; }
-    #admissionRosterTable { width:100%; border-collapse:collapse; min-width:760px; margin:0; background:white; }
-    #admissionRosterTable th, #admissionRosterTable td { padding:10px 8px; border-bottom:1px solid #eee; text-align:left; }
+    .roster-scroll { max-height:70vh; overflow:auto; border:1px solid #ddd; border-radius:8px; }
+    #admissionRosterTable { width:100%; border-collapse:separate; border-spacing:0; min-width:900px; margin:0; background:white; }
+    #admissionRosterTable th, #admissionRosterTable td { padding:10px 8px; border-bottom:1px solid #eee; border-right:1px solid #eee; text-align:left; background:white; }
     #admissionRosterTable th { position:sticky; top:0; z-index:1; background:#f5f1fa; }
+    #admissionRosterTable th:nth-child(1), #admissionRosterTable td:nth-child(1) { position:sticky; left:0; z-index:2; width:64px; min-width:64px; }
+    #admissionRosterTable th:nth-child(1) { z-index:4; }
+    #admissionRosterTable th:nth-child(2), #admissionRosterTable td:nth-child(2) { position:sticky; left:64px; z-index:2; width:160px; min-width:160px; }
+    #admissionRosterTable th:nth-child(2) { z-index:4; }
+    #admissionRosterTable th:nth-child(1), #admissionRosterTable th:nth-child(2) { background:#f5f1fa; }
     .roster-status { display:inline-block; padding:5px 8px; border-radius:999px; font-weight:700; white-space:nowrap; }
     .roster-status.checked-in { background:#d9f4df; color:#167c3a; }
     .roster-status.pending { background:#ffe3e3; color:#b3261e; }
@@ -344,10 +349,10 @@
           <tr>
             <th scope="col">순번</th>
             <th scope="col">이름</th>
+            <th scope="col">입장상태</th>
             <th scope="col">전화번호</th>
             <th scope="col">이메일</th>
             <th scope="col">바코드 일련번호</th>
-            <th scope="col">입장상태</th>
           </tr>
         </thead>
         <tbody id="admissionRosterBody"></tbody>
@@ -2102,13 +2107,13 @@ async function refreshAdmissionRoster() {
       row.innerHTML = '<td></td><td></td><td></td><td></td><td></td><td></td>';
       row.cells[0].textContent = String(index + 1);
       row.cells[1].textContent = person.name;
-      row.cells[2].textContent = person.phone;
-      row.cells[3].textContent = person.email;
-      row.cells[4].textContent = person.code;
       const status = document.createElement('span');
       status.className = 'roster-status ' + (checkedIn ? 'checked-in' : 'pending');
       status.textContent = checkedIn ? '입장' : '미입장';
-      row.cells[5].appendChild(status);
+      row.cells[2].appendChild(status);
+      row.cells[3].textContent = person.phone;
+      row.cells[4].textContent = person.email;
+      row.cells[5].textContent = person.code;
       body.appendChild(row);
     });
     message.textContent = `총 ${sortedPeople.length}명 · 가나다순 · 5초마다 자동 갱신`;
