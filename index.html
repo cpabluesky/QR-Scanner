@@ -300,9 +300,10 @@
     #admissionRoster[hidden] { display:none !important; }
     .roster-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
     .roster-header h3 { margin:0; }
-    #admissionRosterFilters { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px; }
-    .roster-filter { width:auto; min-width:36px; margin:0; padding:7px 9px; border:1px solid #d7cde3; background:#fff; color:#5b3b8c; font-weight:700; }
-    .roster-filter:hover, .roster-filter:focus-visible, .roster-filter.active { background:#5b3b8c; color:#fff; border-color:#5b3b8c; }
+    #admissionRosterFilters { display:flex; flex-wrap:wrap; align-items:center; gap:5px 9px; margin:0 0 10px; line-height:1.5; }
+    .roster-filter { width:auto; min-width:0; height:auto; margin:0; padding:0; border:0; border-radius:0; background:transparent; color:#1976d2; font-size:13px; font-weight:400; line-height:1.5; text-decoration:underline; }
+    .roster-filter:hover, .roster-filter:focus-visible { color:#0d47a1; }
+    .roster-filter.active { color:#0d47a1; font-weight:700; }
     #closeAdmissionRoster { width:auto; margin:0; background:#eee; color:#222; }
     .roster-scroll { max-height:70vh; overflow:auto; border:1px solid #ddd; border-radius:8px; }
     #admissionRosterTable { width:100%; min-width:600px; table-layout:fixed; border-collapse:separate; border-spacing:0; margin:0; background:white; }
@@ -310,7 +311,7 @@
     #admissionRosterTable th { position:sticky; top:0; z-index:1; background:#f5f1fa; white-space:nowrap; }
     #admissionRosterTable th:nth-child(1), #admissionRosterTable td:nth-child(1) { position:sticky; left:0; z-index:2; width:64px; min-width:64px; }
     #admissionRosterTable th:nth-child(1) { z-index:4; }
-    #admissionRosterTable th:nth-child(2), #admissionRosterTable td:nth-child(2) { position:sticky; left:64px; z-index:2; width:72px; min-width:72px; }
+    #admissionRosterTable th:nth-child(2), #admissionRosterTable td:nth-child(2) { position:sticky; left:64px; z-index:2; width:108px; min-width:108px; }
     #admissionRosterTable th:nth-child(2) { z-index:4; }
     #admissionRosterTable th:nth-child(1), #admissionRosterTable th:nth-child(2) { background:#f5f1fa; }
     .column-resizer { position:absolute; right:-3px; top:0; width:7px; height:100%; cursor:col-resize; touch-action:none; z-index:5; }
@@ -362,7 +363,7 @@
       <table id="admissionRosterTable">
         <colgroup>
           <col style="width:64px">
-          <col style="width:72px">
+          <col style="width:108px">
           <col style="width:90px">
           <col style="width:120px">
           <col style="width:150px">
