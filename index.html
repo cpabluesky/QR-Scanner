@@ -1412,7 +1412,7 @@ function displaySearchResults(results) {
 
           person.email || "",
 
-          person.phone || "",
+          formatPhone(person.phone) || "",
 
           person.gender || "",
 
@@ -1589,7 +1589,7 @@ function displayPerson(person) {
   document.getElementById(
     "personPhone"
   ).textContent =
-    person.phone || "";
+    formatPhone(person.phone) || "";
 
 
   document.getElementById(
@@ -2138,6 +2138,23 @@ function escapeHtml(value) {
 
 }
 
+function phoneDisplayDigits(phone) {
+  let digits = String(phone || '').replace(/\D/g, '');
+  if (digits.startsWith('4')) digits = '0' + digits;
+  return digits;
+}
+
+function formatPhone(phone) {
+  const digits = phoneDisplayDigits(phone);
+  if (digits.length === 10) {
+    return `${digits.slice(0, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  if (digits.length > 10) {
+    return `${digits.slice(0, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return String(phone || '').trim();
+}
+
 
 function setSearchAndScannerVisible(visible) {
   const elements = {
@@ -2244,7 +2261,7 @@ function showPersonDetail(person) {
   detailPerson = person;
   document.getElementById('detailName').textContent = person.name || '';
   document.getElementById('detailEmail').textContent = person.email || '';
-  document.getElementById('detailPhone').textContent = person.phone || '';
+  document.getElementById('detailPhone').textContent = formatPhone(person.phone) || '';
   document.getElementById('detailGender').textContent = person.gender || '';
   document.getElementById('detailAge').textContent = person.age || '';
   document.getElementById('detailRegistrationId').textContent = person.registrationId || '';
@@ -2373,7 +2390,7 @@ async function refreshAdmissionRoster() {
       status.className = 'roster-status ' + (checkedIn ? 'checked-in' : 'pending');
       status.textContent = checkedIn ? '입장' : '미입장';
       row.cells[2].appendChild(status);
-      row.cells[3].textContent = person.phone;
+      row.cells[3].textContent = formatPhone(person.phone);
       row.cells[4].textContent = person.email;
       row.cells[5].textContent = person.code;
       body.appendChild(row);
@@ -2569,8 +2586,10 @@ function matchesRegistration(person, keyword) {
     String(value || '').toLocaleLowerCase().includes(query))) return true;
   // A phone fragment also matches across spaces, parentheses and hyphens.
   const digits = query.replace(/\D/g, '');
+  const normalizedQuery = phoneDisplayDigits(digits);
+  const normalizedPhone = phoneDisplayDigits(person.phone);
   return digits.length > 0 && /^[+\d\s().-]+$/.test(query) &&
-    String(person.phone || '').replace(/\D/g, '').includes(digits);
+    (normalizedPhone.includes(normalizedQuery) || String(person.phone || '').replace(/\D/g, '').includes(digits));
 }
 function localSearch(keyword, callback) {
   admissionRequest(async () => {
