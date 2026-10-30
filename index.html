@@ -642,6 +642,7 @@ const html5QrCode =
 function requestCamera() {
 
   if (!admissionsConfigured) return alert('입장 DB 연결 설정을 확인해 주세요.');
+  closeAdmissionStatistics();
   admissionViewVersion++;
 
   currentMode = "scan";
@@ -1070,6 +1071,7 @@ function lookupPerson(qrCode) {
 function openNameSearch() {
 
   if (!admissionsConfigured) return alert('입장 DB 연결 설정을 확인해 주세요.');
+  closeAdmissionStatistics();
   admissionViewVersion++;
   visibleSearchResults = [];
 
