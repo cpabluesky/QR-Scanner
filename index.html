@@ -337,9 +337,16 @@
     .person-detail-row { display:grid; grid-template-columns:110px 1fr; gap:10px; padding:8px 0; border-bottom:1px solid #eee; }
     .person-detail-row dt { font-weight:700; color:#555; }
     .person-detail-row dd { margin:0; overflow-wrap:anywhere; }
-    #closePersonDetail { width:100%; margin:14px 0 8px; }
+    #detailAdmissionStatus { display:inline-block; padding:6px 10px; border-radius:999px; font-weight:700; }
+    #detailAdmissionStatus.checked-in { background:#d9f4df; color:#167c3a; }
+    #detailAdmissionStatus.pending { background:#ffe3e3; color:#b3261e; }
+    #detailAdmissionStatus.neutral { background:#eee; color:#555; }
+    #closePersonDetail { width:100%; margin:14px 0 8px; background:#777; color:#fff; }
     .person-detail-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
     .person-detail-actions button { margin:0; width:100%; }
+    #processPersonAdmission { background:#167c3a; color:#fff; }
+    #cancelPersonAdmission { background:#b3261e; color:#fff; }
+    .person-detail-actions button:disabled { background:#aaa; color:#fff; }
     #cancelPersonAdmission { background:#b3261e; }
     #personDetailStatus { font-weight:700; }
     #databaseMessage { font-size:14px; white-space:pre-wrap; }
@@ -2157,6 +2164,7 @@ async function refreshPersonDetailStatus() {
   const processButton = document.getElementById('processPersonAdmission');
   const cancelButton = document.getElementById('cancelPersonAdmission');
   statusElement.textContent = '조회 중...';
+  statusElement.className = 'neutral';
   try {
     if (!admissionsConfigured) throw new Error('입장 DB 연결 설정을 확인해 주세요.');
     const states = await admissionStore.getStates([detailPerson.code]);
@@ -2165,10 +2173,12 @@ async function refreshPersonDetailStatus() {
     statusElement.textContent = checkedIn
       ? `입장 · ${formatAdmissionTime(state.checked_in_at)}`
       : '미입장';
+    statusElement.className = checkedIn ? 'checked-in' : 'pending';
     processButton.disabled = detailActionBusy || checkedIn;
     cancelButton.disabled = detailActionBusy || !checkedIn;
   } catch (error) {
     statusElement.textContent = '상태 조회 실패 · ' + error.message;
+    statusElement.className = 'neutral';
     processButton.disabled = true;
     cancelButton.disabled = true;
   }
@@ -2194,7 +2204,9 @@ async function processPersonAdmission() {
   detailActionBusy = true;
   document.getElementById('processPersonAdmission').disabled = true;
   document.getElementById('cancelPersonAdmission').disabled = true;
-  document.getElementById('detailAdmissionStatus').textContent = '입장 처리 중...';
+  const statusElement = document.getElementById('detailAdmissionStatus');
+  statusElement.textContent = '입장 처리 중...';
+  statusElement.className = 'neutral';
   try {
     await admissionStore.checkIn(detailPerson.code);
     detailActionBusy = false;
@@ -2202,7 +2214,9 @@ async function processPersonAdmission() {
     await refreshAdmissionRoster();
   } catch (error) {
     detailActionBusy = false;
-    document.getElementById('detailAdmissionStatus').textContent = '입장 처리 실패 · ' + error.message;
+    const statusElement = document.getElementById('detailAdmissionStatus');
+    statusElement.textContent = '입장 처리 실패 · ' + error.message;
+    statusElement.className = 'neutral';
     await refreshPersonDetailStatus();
   }
 }
@@ -2212,7 +2226,9 @@ async function cancelPersonAdmission() {
   detailActionBusy = true;
   document.getElementById('processPersonAdmission').disabled = true;
   document.getElementById('cancelPersonAdmission').disabled = true;
-  document.getElementById('detailAdmissionStatus').textContent = '입장 취소 중...';
+  const statusElement = document.getElementById('detailAdmissionStatus');
+  statusElement.textContent = '입장 취소 중...';
+  statusElement.className = 'neutral';
   try {
     await admissionStore.cancelCheckIn(detailPerson.code);
     detailActionBusy = false;
@@ -2220,7 +2236,9 @@ async function cancelPersonAdmission() {
     await refreshAdmissionRoster();
   } catch (error) {
     detailActionBusy = false;
-    document.getElementById('detailAdmissionStatus').textContent = '입장 취소 실패 · ' + error.message;
+    const statusElement = document.getElementById('detailAdmissionStatus');
+    statusElement.textContent = '입장 취소 실패 · ' + error.message;
+    statusElement.className = 'neutral';
     await refreshPersonDetailStatus();
   }
 }
