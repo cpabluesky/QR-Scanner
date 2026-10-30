@@ -370,7 +370,7 @@
     <progress id="admissionProgress" max="100" value="0" aria-label="등록자 대비 입장률"></progress>
     <a id="admissionRosterLink" href="#" onclick="openAdmissionRoster(event)">참가자 입장 조회</a>
     <p id="admissionStatsMessage" role="status"></p>
-    <button type="button" onclick="closeAdmissionStatistics()">현황정보 닫기</button>
+    <button type="button" onclick="returnToSearchFromStatistics()">검색/조회 화면으로 돌아가기</button>
   </section>
 
   <section id="admissionRoster" hidden aria-labelledby="admissionRosterHeading">
@@ -2138,19 +2138,62 @@ function escapeHtml(value) {
 }
 
 
-function toggleAdmissionStatistics() {
+function openAdmissionStatistics() {
   const panel = document.getElementById('admissionStatistics');
   const button = document.getElementById('admissionStatsToggle');
-  panel.hidden = !panel.hidden;
-  button.setAttribute('aria-expanded', String(!panel.hidden));
-  if (!panel.hidden) refreshAdmissionStatistics();
+  document.getElementById('admissionRoster').hidden = true;
+  panel.hidden = false;
+  button.setAttribute('aria-expanded', 'true');
+
+  ['cameraStartArea','reader','scannerSearchArea','nameSearchArea','status','personCard'].forEach(id => {
+    const element = document.getElementById(id);
+    if (element) element.hidden = true;
+  });
+
+  if (scannerRunning) {
+    html5QrCode.stop().then(() => { scannerRunning = false; }).catch(() => { scannerRunning = false; });
+    admissionViewVersion++;
+  }
+
+  window.scrollTo({top:0});
+  refreshAdmissionStatistics();
+}
+
+function toggleAdmissionStatistics() {
+  const panel = document.getElementById('admissionStatistics');
+  if (panel.hidden) openAdmissionStatistics();
+  else returnToSearchFromStatistics();
 }
 
 function closeAdmissionStatistics() {
   document.getElementById('admissionStatistics').hidden = true;
   const button = document.getElementById('admissionStatsToggle');
   button.setAttribute('aria-expanded', 'false');
-  button.focus();
+}
+
+function returnToSearchFromStatistics() {
+  closeAdmissionStatistics();
+  document.getElementById('admissionRoster').hidden = true;
+  document.querySelector('.topbar').hidden = false;
+  document.getElementById('databaseMessage').hidden = false;
+
+  ['cameraStartArea','reader','scannerSearchArea','nameSearchArea','status','personCard'].forEach(id => {
+    const element = document.getElementById(id);
+    if (element) element.hidden = false;
+  });
+
+  document.getElementById('cameraStartArea').style.display = 'block';
+  document.getElementById('reader').style.display = 'block';
+  document.getElementById('scannerSearchArea').style.display = 'none';
+  document.getElementById('nameSearchArea').style.display = 'none';
+  document.getElementById('status').style.display = 'block';
+  document.getElementById('status').innerHTML = 'QR 코드 스캔 또는 이름, 전화번호, 이메일로 찾기를 선택해 주세요.';
+  document.getElementById('personCard').style.display = 'none';
+  currentMode = 'scan';
+  currentQRCode = '';
+  processing = false;
+  admissionViewVersion++;
+  window.scrollTo({top:0});
 }
 
 let admissionRosterBusy = false;
@@ -2398,15 +2441,7 @@ function openAdmissionRoster(event) {
 
 function closeAdmissionRoster() {
   document.getElementById('admissionRoster').hidden = true;
-  document.querySelector('.topbar').hidden = false;
-  document.getElementById('databaseMessage').hidden = false;
-  ['cameraStartArea','reader','scannerSearchArea','nameSearchArea','status','personCard'].forEach(id => {
-    const element = document.getElementById(id); if (element) element.hidden = false;
-  });
-  document.getElementById('admissionStatistics').hidden = false;
-  document.getElementById('admissionStatsToggle').setAttribute('aria-expanded', 'true');
-  refreshAdmissionStatistics();
-  window.scrollTo({top:0});
+  returnToSearchFromStatistics();
 }
 
 /* Registration lookups use a CSV in the same GitHub Pages directory. */
