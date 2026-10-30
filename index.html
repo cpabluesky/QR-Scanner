@@ -312,10 +312,14 @@
     #admissionRosterTable th:nth-child(1), #admissionRosterTable th:nth-child(2) { background:#f5f1fa; }
     .column-resizer { position:absolute; right:-3px; top:0; width:7px; height:100%; cursor:col-resize; touch-action:none; z-index:5; }
     #admissionRosterTable th { position:sticky; }
-    #admissionRosterTable td { overflow:hidden; overflow-wrap:anywhere; white-space:normal; }
+    #admissionRosterTable td { height:42px; max-height:42px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     @media (orientation: landscape) {
-      #admissionRosterTable { width:100%; min-width:0; }
-      .roster-scroll { max-height:calc(100vh - 130px); }
+      body { padding:10px; }
+      .container { max-width:none; width:100%; }
+      #admissionRoster { width:100%; padding:10px; }
+      #admissionRosterTable { width:100%; min-width:100%; }
+      .roster-scroll { width:100%; max-height:calc(100vh - 100px); }
+      .roster-header { margin-bottom:6px; }
     }
     .roster-status { display:inline-block; padding:5px 8px; border-radius:999px; font-weight:700; white-space:nowrap; }
     .roster-status.checked-in { background:#d9f4df; color:#167c3a; }
