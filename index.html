@@ -295,6 +295,19 @@
     #admissionStatsCount { font-size:24px; font-weight:bold; margin:8px 0; }
     #admissionProgress { width:100%; height:20px; accent-color:#5b3b8c; }
     #admissionStatsMessage { font-size:13px; margin-bottom:0; }
+    #admissionRosterLink { display:inline-block; margin:10px 0 2px; color:#5b3b8c; font-weight:700; text-decoration:underline; }
+    #admissionRoster { background:white; border-radius:10px; margin-bottom:15px; padding:18px; }
+    #admissionRoster[hidden] { display:none !important; }
+    .roster-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .roster-header h3 { margin:0; }
+    #closeAdmissionRoster { width:auto; margin:0; background:#eee; color:#222; }
+    .roster-scroll { max-height:70vh; overflow-y:auto; border:1px solid #ddd; border-radius:8px; }
+    #admissionRosterTable { width:100%; border-collapse:collapse; min-width:760px; margin:0; background:white; }
+    #admissionRosterTable th, #admissionRosterTable td { padding:10px 8px; border-bottom:1px solid #eee; text-align:left; }
+    #admissionRosterTable th { position:sticky; top:0; z-index:1; background:#f5f1fa; }
+    .roster-status { display:inline-block; padding:5px 8px; border-radius:999px; font-weight:700; white-space:nowrap; }
+    .roster-status.checked-in { background:#d9f4df; color:#167c3a; }
+    .roster-status.pending { background:#ffe3e3; color:#b3261e; }
     #databaseMessage { font-size:14px; white-space:pre-wrap; }
   </style>
 
@@ -314,8 +327,32 @@
       <p id="admissionStatsPercentage"></p>
     </div>
     <progress id="admissionProgress" max="100" value="0" aria-label="등록자 대비 입장률"></progress>
+    <a id="admissionRosterLink" href="#" onclick="openAdmissionRoster(event)">참가자 입장 조회</a>
     <p id="admissionStatsMessage" role="status"></p>
     <button type="button" onclick="closeAdmissionStatistics()">현황정보 닫기</button>
+  </section>
+
+  <section id="admissionRoster" hidden aria-labelledby="admissionRosterHeading">
+    <div class="roster-header">
+      <h3 id="admissionRosterHeading">참가자 입장 조회</h3>
+      <button id="closeAdmissionRoster" type="button" onclick="closeAdmissionRoster()">조회 화면 닫기</button>
+    </div>
+    <p id="admissionRosterMessage" role="status">입장 명단을 불러오고 있습니다.</p>
+    <div class="roster-scroll">
+      <table id="admissionRosterTable">
+        <thead>
+          <tr>
+            <th scope="col">순번</th>
+            <th scope="col">이름</th>
+            <th scope="col">전화번호</th>
+            <th scope="col">이메일</th>
+            <th scope="col">바코드 일련번호</th>
+            <th scope="col">입장상태</th>
+          </tr>
+        </thead>
+        <tbody id="admissionRosterBody"></tbody>
+      </table>
+    </div>
   </section>
 
 
@@ -2041,6 +2078,72 @@ function closeAdmissionStatistics() {
   button.focus();
 }
 
+let admissionRosterBusy = false;
+
+async function refreshAdmissionRoster() {
+  const panel = document.getElementById('admissionRoster');
+  if (panel.hidden || document.hidden || admissionRosterBusy) return;
+  const message = document.getElementById('admissionRosterMessage');
+  const body = document.getElementById('admissionRosterBody');
+  admissionRosterBusy = true;
+  try {
+    if (!admissionsConfigured) throw new Error('입장 DB 연결 설정을 확인해 주세요.');
+    if (!registrationLoaded) throw new Error('등록자 명단을 불러오는 중입니다.');
+    const sortedPeople = [...registrationList].sort((a, b) =>
+      a.name.localeCompare(b.name, 'ko', {sensitivity:'base', numeric:true}) ||
+      a.code.localeCompare(b.code, 'ko', {numeric:true})
+    );
+    const states = await admissionStore.getStates(sortedPeople.map(person => person.code));
+    body.replaceChildren();
+    sortedPeople.forEach((person, index) => {
+      const state = states.get(person.code);
+      const checkedIn = state.status === 'checked_in';
+      const row = document.createElement('tr');
+      row.innerHTML = '<td></td><td></td><td></td><td></td><td></td><td></td>';
+      row.cells[0].textContent = String(index + 1);
+      row.cells[1].textContent = person.name;
+      row.cells[2].textContent = person.phone;
+      row.cells[3].textContent = person.email;
+      row.cells[4].textContent = person.code;
+      const status = document.createElement('span');
+      status.className = 'roster-status ' + (checkedIn ? 'checked-in' : 'pending');
+      status.textContent = checkedIn ? '입장' : '미입장';
+      row.cells[5].appendChild(status);
+      body.appendChild(row);
+    });
+    message.textContent = `총 ${sortedPeople.length}명 · 가나다순 · 5초마다 자동 갱신`;
+  } catch (error) {
+    message.textContent = '입장 명단을 불러오지 못했습니다. · ' + error.message;
+  } finally {
+    admissionRosterBusy = false;
+  }
+}
+
+function openAdmissionRoster(event) {
+  if (event) event.preventDefault();
+  document.getElementById('admissionStatistics').hidden = true;
+  document.getElementById('admissionRoster').hidden = false;
+  const hiddenIds = ['topbar','cameraStartArea','reader','scannerSearchArea','nameSearchArea','status','personCard'];
+  document.querySelector('.topbar').hidden = true;
+  document.getElementById('databaseMessage').hidden = true;
+  hiddenIds.forEach(id => { const element = document.getElementById(id); if (element) element.hidden = true; });
+  window.scrollTo({top:0});
+  refreshAdmissionRoster();
+}
+
+function closeAdmissionRoster() {
+  document.getElementById('admissionRoster').hidden = true;
+  document.querySelector('.topbar').hidden = false;
+  document.getElementById('databaseMessage').hidden = false;
+  ['cameraStartArea','reader','scannerSearchArea','nameSearchArea','status','personCard'].forEach(id => {
+    const element = document.getElementById(id); if (element) element.hidden = false;
+  });
+  document.getElementById('admissionStatistics').hidden = false;
+  document.getElementById('admissionStatsToggle').setAttribute('aria-expanded', 'true');
+  refreshAdmissionStatistics();
+  window.scrollTo({top:0});
+}
+
 /* Registration lookups use a CSV in the same GitHub Pages directory. */
 const REGISTRATION_FILE = './registrations.csv';
 let registrationList = [];
@@ -2212,6 +2315,7 @@ async function refreshAdmissionStatistics() {
 function refreshAdmissionViews() {
   refreshVisibleAdmissions();
   refreshAdmissionStatistics();
+  refreshAdmissionRoster();
 }
 
 async function refreshVisibleAdmissions() {
