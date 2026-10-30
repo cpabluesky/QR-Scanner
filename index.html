@@ -305,6 +305,7 @@
     .roster-filter:hover, .roster-filter:focus-visible { color:#0d47a1; }
     .roster-filter.active { color:#0d47a1; font-weight:700; }
     #closeAdmissionRoster { width:auto; margin:0; background:#d9ecff; color:#145a96; }
+    #returnFromAdmissionStatistics { width:100%; margin-top:16px; background:#d9ecff; color:#145a96; }
     .roster-scroll { max-height:70vh; overflow:auto; border:1px solid #ddd; border-radius:8px; }
     #admissionRosterTable { width:100%; min-width:600px; table-layout:fixed; border-collapse:separate; border-spacing:0; margin:0; background:white; }
     #admissionRosterTable th, #admissionRosterTable td { padding:10px 8px; border-bottom:1px solid #eee; border-right:1px solid #eee; text-align:left; background:white; overflow:hidden; }
@@ -370,7 +371,7 @@
     <progress id="admissionProgress" max="100" value="0" aria-label="등록자 대비 입장률"></progress>
     <a id="admissionRosterLink" href="#" onclick="openAdmissionRoster(event)">참가자 입장 조회</a>
     <p id="admissionStatsMessage" role="status"></p>
-    <button type="button" onclick="returnToSearchFromStatistics()">검색/조회 화면으로 돌아가기</button>
+    <button id="returnFromAdmissionStatistics" type="button" onclick="returnToSearchFromStatistics()">검색/조회 화면으로 돌아가기</button>
   </section>
 
   <section id="admissionRoster" hidden aria-labelledby="admissionRosterHeading">
@@ -2138,17 +2139,33 @@ function escapeHtml(value) {
 }
 
 
+function setSearchAndScannerVisible(visible) {
+  const elements = {
+    cameraStartArea: visible ? 'block' : 'none',
+    reader: visible ? 'block' : 'none',
+    scannerSearchArea: 'none',
+    nameSearchArea: 'none',
+    status: visible ? 'block' : 'none',
+    personCard: 'none'
+  };
+
+  Object.entries(elements).forEach(([id, display]) => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.hidden = !visible && id !== 'scannerSearchArea' && id !== 'nameSearchArea' && id !== 'personCard' ? true : (display === 'none' ? true : false);
+    element.style.display = display;
+  });
+}
+
 function openAdmissionStatistics() {
   const panel = document.getElementById('admissionStatistics');
   const button = document.getElementById('admissionStatsToggle');
   document.getElementById('admissionRoster').hidden = true;
   panel.hidden = false;
   button.setAttribute('aria-expanded', 'true');
-
-  ['cameraStartArea','reader','scannerSearchArea','nameSearchArea','status','personCard'].forEach(id => {
-    const element = document.getElementById(id);
-    if (element) element.hidden = true;
-  });
+  document.getElementById('databaseMessage').hidden = true;
+  document.getElementById('databaseMessage').style.display = 'none';
+  setSearchAndScannerVisible(false);
 
   if (scannerRunning) {
     html5QrCode.stop().then(() => { scannerRunning = false; }).catch(() => { scannerRunning = false; });
@@ -2177,18 +2194,10 @@ function returnToSearchFromStatistics() {
   document.querySelector('.topbar').hidden = false;
   document.getElementById('databaseMessage').hidden = false;
 
-  ['cameraStartArea','reader','scannerSearchArea','nameSearchArea','status','personCard'].forEach(id => {
-    const element = document.getElementById(id);
-    if (element) element.hidden = false;
-  });
-
-  document.getElementById('cameraStartArea').style.display = 'block';
-  document.getElementById('reader').style.display = 'block';
-  document.getElementById('scannerSearchArea').style.display = 'none';
-  document.getElementById('nameSearchArea').style.display = 'none';
-  document.getElementById('status').style.display = 'block';
+  document.getElementById('databaseMessage').hidden = false;
+  document.getElementById('databaseMessage').style.display = 'block';
+  setSearchAndScannerVisible(true);
   document.getElementById('status').innerHTML = 'QR 코드 스캔 또는 이름, 전화번호, 이메일로 찾기를 선택해 주세요.';
-  document.getElementById('personCard').style.display = 'none';
   currentMode = 'scan';
   currentQRCode = '';
   processing = false;
@@ -2431,7 +2440,9 @@ function openAdmissionRoster(event) {
   const hiddenIds = ['topbar','cameraStartArea','reader','scannerSearchArea','nameSearchArea','status','personCard'];
   document.querySelector('.topbar').hidden = true;
   document.getElementById('databaseMessage').hidden = true;
-  hiddenIds.forEach(id => { const element = document.getElementById(id); if (element) element.hidden = true; });
+  document.getElementById('databaseMessage').style.display = 'none';
+  hiddenIds.forEach(id => { const element = document.getElementById(id); if (element) { element.hidden = true; element.style.display = 'none'; } });
+  setSearchAndScannerVisible(false);
   admissionRosterFilter = 'ALL';
   admissionRosterJumpRequested = false;
   initializeRosterColumnResize();
