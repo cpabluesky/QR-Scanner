@@ -302,14 +302,21 @@
     .roster-header h3 { margin:0; }
     #closeAdmissionRoster { width:auto; margin:0; background:#eee; color:#222; }
     .roster-scroll { max-height:70vh; overflow:auto; border:1px solid #ddd; border-radius:8px; }
-    #admissionRosterTable { width:100%; border-collapse:separate; border-spacing:0; min-width:900px; margin:0; background:white; }
-    #admissionRosterTable th, #admissionRosterTable td { padding:10px 8px; border-bottom:1px solid #eee; border-right:1px solid #eee; text-align:left; background:white; }
-    #admissionRosterTable th { position:sticky; top:0; z-index:1; background:#f5f1fa; }
+    #admissionRosterTable { width:100%; min-width:600px; table-layout:fixed; border-collapse:separate; border-spacing:0; margin:0; background:white; }
+    #admissionRosterTable th, #admissionRosterTable td { padding:10px 8px; border-bottom:1px solid #eee; border-right:1px solid #eee; text-align:left; background:white; overflow:hidden; }
+    #admissionRosterTable th { position:sticky; top:0; z-index:1; background:#f5f1fa; white-space:nowrap; }
     #admissionRosterTable th:nth-child(1), #admissionRosterTable td:nth-child(1) { position:sticky; left:0; z-index:2; width:64px; min-width:64px; }
     #admissionRosterTable th:nth-child(1) { z-index:4; }
-    #admissionRosterTable th:nth-child(2), #admissionRosterTable td:nth-child(2) { position:sticky; left:64px; z-index:2; width:160px; min-width:160px; }
+    #admissionRosterTable th:nth-child(2), #admissionRosterTable td:nth-child(2) { position:sticky; left:64px; z-index:2; width:72px; min-width:72px; }
     #admissionRosterTable th:nth-child(2) { z-index:4; }
     #admissionRosterTable th:nth-child(1), #admissionRosterTable th:nth-child(2) { background:#f5f1fa; }
+    .column-resizer { position:absolute; right:-3px; top:0; width:7px; height:100%; cursor:col-resize; touch-action:none; z-index:5; }
+    #admissionRosterTable th { position:sticky; }
+    #admissionRosterTable td { overflow:hidden; overflow-wrap:anywhere; white-space:normal; }
+    @media (orientation: landscape) {
+      #admissionRosterTable { width:100%; min-width:0; }
+      .roster-scroll { max-height:calc(100vh - 130px); }
+    }
     .roster-status { display:inline-block; padding:5px 8px; border-radius:999px; font-weight:700; white-space:nowrap; }
     .roster-status.checked-in { background:#d9f4df; color:#167c3a; }
     .roster-status.pending { background:#ffe3e3; color:#b3261e; }
@@ -345,14 +352,22 @@
     <p id="admissionRosterMessage" role="status">입장 명단을 불러오고 있습니다.</p>
     <div class="roster-scroll">
       <table id="admissionRosterTable">
+        <colgroup>
+          <col style="width:64px">
+          <col style="width:72px">
+          <col style="width:90px">
+          <col style="width:120px">
+          <col style="width:150px">
+          <col style="width:auto">
+        </colgroup>
         <thead>
           <tr>
-            <th scope="col">순번</th>
-            <th scope="col">이름</th>
-            <th scope="col">입장상태</th>
-            <th scope="col">전화번호</th>
-            <th scope="col">이메일</th>
-            <th scope="col">바코드 일련번호</th>
+            <th scope="col">순번<span class="column-resizer"></span></th>
+            <th scope="col">이름<span class="column-resizer"></span></th>
+            <th scope="col">입장상태<span class="column-resizer"></span></th>
+            <th scope="col">전화번호<span class="column-resizer"></span></th>
+            <th scope="col">이메일<span class="column-resizer"></span></th>
+            <th scope="col">바코드 일련번호<span class="column-resizer"></span></th>
           </tr>
         </thead>
         <tbody id="admissionRosterBody"></tbody>
@@ -2124,6 +2139,47 @@ async function refreshAdmissionRoster() {
   }
 }
 
+function initializeRosterColumnResize() {
+  const table = document.getElementById('admissionRosterTable');
+  const headers = [...table.querySelectorAll('thead th')];
+  const columns = [...table.querySelectorAll('colgroup col')];
+  headers.forEach((header, index) => {
+    if (header.dataset.resizable === 'true') return;
+    header.dataset.resizable = 'true';
+    const handle = header.querySelector('.column-resizer');
+    if (!handle) return;
+    handle.addEventListener('pointerdown', event => {
+      event.preventDefault();
+      handle.setPointerCapture(event.pointerId);
+      const startX = event.clientX;
+      const startWidth = parseFloat(columns[index].style.width) ||
+        columns[index].getBoundingClientRect().width || header.getBoundingClientRect().width;
+      const minimum = index === 0 ? 48 : index === 1 ? 48 : 70;
+      const onMove = moveEvent => {
+        const width = Math.max(minimum, Math.min(300, startWidth + moveEvent.clientX - startX));
+        columns[index].style.width = `${Math.round(width)}px`;
+        table.querySelectorAll(`tr > :nth-child(${index + 1})`).forEach(cell => {
+          cell.style.width = `${Math.round(width)}px`;
+          cell.style.minWidth = `${Math.round(width)}px`;
+        });
+        if (index === 0 || index === 1) {
+          const firstWidth = parseFloat(columns[0].style.width) ||
+            columns[0].getBoundingClientRect().width || 64;
+          table.querySelectorAll('th:nth-child(2), td:nth-child(2)').forEach(cell => {
+            cell.style.left = `${firstWidth}px`;
+          });
+        }
+      };
+      const onUp = () => {
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+      };
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+    });
+  });
+}
+
 function openAdmissionRoster(event) {
   if (event) event.preventDefault();
   document.getElementById('admissionStatistics').hidden = true;
@@ -2132,6 +2188,7 @@ function openAdmissionRoster(event) {
   document.querySelector('.topbar').hidden = true;
   document.getElementById('databaseMessage').hidden = true;
   hiddenIds.forEach(id => { const element = document.getElementById(id); if (element) element.hidden = true; });
+  initializeRosterColumnResize();
   window.scrollTo({top:0});
   refreshAdmissionRoster();
 }
