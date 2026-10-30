@@ -1331,6 +1331,7 @@ function searchByName() {
 ===================================================== */
 
 function displaySearchResults(results) {
+  closeAdmissionStatistics();
   visibleSearchResults = results;
 
   const resultsArea =
@@ -1550,6 +1551,7 @@ function selectSearchResult(person) {
 
 function displayPerson(person) {
 
+  closeAdmissionStatistics();
   document.getElementById('personRegistrationId').textContent =
     person.registrationId || '';
 
