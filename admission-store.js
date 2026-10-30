@@ -33,6 +33,14 @@ window.createAdmissionStore = function(client) {
         throw new Error('입장 DB 응답을 확인할 수 없습니다. 다시 조회해 주세요.');
       }
       return data;
+    },
+    async cancelCheckIn(code) {
+      const {data, error} = await client.rpc('cancel_check_in', {p_bar_code:code});
+      fail(error);
+      if (!data || data.success !== true || typeof data.found !== 'boolean') {
+        throw new Error('입장 취소 DB 응답을 확인할 수 없습니다. 다시 조회해 주세요.');
+      }
+      return data;
     }
   };
 };

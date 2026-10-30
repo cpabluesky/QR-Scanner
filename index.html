@@ -337,7 +337,11 @@
     .person-detail-row { display:grid; grid-template-columns:110px 1fr; gap:10px; padding:8px 0; border-bottom:1px solid #eee; }
     .person-detail-row dt { font-weight:700; color:#555; }
     .person-detail-row dd { margin:0; overflow-wrap:anywhere; }
-    #closePersonDetail { width:100%; margin:14px 0 0; }
+    #closePersonDetail { width:100%; margin:14px 0 8px; }
+    .person-detail-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .person-detail-actions button { margin:0; width:100%; }
+    #cancelPersonAdmission { background:#b3261e; }
+    #personDetailStatus { font-weight:700; }
     #databaseMessage { font-size:14px; white-space:pre-wrap; }
   </style>
 
@@ -405,8 +409,13 @@
         <div class="person-detail-row"><dt>연령대</dt><dd id="detailAge"></dd></div>
         <div class="person-detail-row"><dt>고유번호</dt><dd id="detailRegistrationId"></dd></div>
         <div class="person-detail-row"><dt>QR코드 번호</dt><dd id="detailCode"></dd></div>
+        <div class="person-detail-row"><dt>현재 입장 상태</dt><dd id="detailAdmissionStatus"></dd></div>
       </dl>
       <button id="closePersonDetail" type="button" onclick="closePersonDetail()">닫기</button>
+      <div class="person-detail-actions">
+        <button id="processPersonAdmission" type="button" onclick="processPersonAdmission()">입장처리</button>
+        <button id="cancelPersonAdmission" type="button" onclick="cancelPersonAdmission()">입장 취소</button>
+      </div>
     </div>
   </dialog>
 
@@ -2139,7 +2148,34 @@ let admissionRosterJumpRequested = false;
 
 const koreanInitials = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
 
+let detailPerson = null;
+let detailActionBusy = false;
+
+async function refreshPersonDetailStatus() {
+  if (!detailPerson) return;
+  const statusElement = document.getElementById('detailAdmissionStatus');
+  const processButton = document.getElementById('processPersonAdmission');
+  const cancelButton = document.getElementById('cancelPersonAdmission');
+  statusElement.textContent = '조회 중...';
+  try {
+    if (!admissionsConfigured) throw new Error('입장 DB 연결 설정을 확인해 주세요.');
+    const states = await admissionStore.getStates([detailPerson.code]);
+    const state = states.get(detailPerson.code);
+    const checkedIn = state.status === 'checked_in';
+    statusElement.textContent = checkedIn
+      ? `입장 · ${formatAdmissionTime(state.checked_in_at)}`
+      : '미입장';
+    processButton.disabled = detailActionBusy || checkedIn;
+    cancelButton.disabled = detailActionBusy || !checkedIn;
+  } catch (error) {
+    statusElement.textContent = '상태 조회 실패 · ' + error.message;
+    processButton.disabled = true;
+    cancelButton.disabled = true;
+  }
+}
+
 function showPersonDetail(person) {
+  detailPerson = person;
   document.getElementById('detailName').textContent = person.name || '';
   document.getElementById('detailEmail').textContent = person.email || '';
   document.getElementById('detailPhone').textContent = person.phone || '';
@@ -2150,12 +2186,50 @@ function showPersonDetail(person) {
   const dialog = document.getElementById('personDetailDialog');
   if (typeof dialog.showModal === 'function') dialog.showModal();
   else dialog.setAttribute('open', '');
+  refreshPersonDetailStatus();
+}
+
+async function processPersonAdmission() {
+  if (!detailPerson || detailActionBusy) return;
+  detailActionBusy = true;
+  document.getElementById('processPersonAdmission').disabled = true;
+  document.getElementById('cancelPersonAdmission').disabled = true;
+  document.getElementById('detailAdmissionStatus').textContent = '입장 처리 중...';
+  try {
+    await admissionStore.checkIn(detailPerson.code);
+    detailActionBusy = false;
+    await refreshPersonDetailStatus();
+    await refreshAdmissionRoster();
+  } catch (error) {
+    detailActionBusy = false;
+    document.getElementById('detailAdmissionStatus').textContent = '입장 처리 실패 · ' + error.message;
+    await refreshPersonDetailStatus();
+  }
+}
+
+async function cancelPersonAdmission() {
+  if (!detailPerson || detailActionBusy) return;
+  detailActionBusy = true;
+  document.getElementById('processPersonAdmission').disabled = true;
+  document.getElementById('cancelPersonAdmission').disabled = true;
+  document.getElementById('detailAdmissionStatus').textContent = '입장 취소 중...';
+  try {
+    await admissionStore.cancelCheckIn(detailPerson.code);
+    detailActionBusy = false;
+    await refreshPersonDetailStatus();
+    await refreshAdmissionRoster();
+  } catch (error) {
+    detailActionBusy = false;
+    document.getElementById('detailAdmissionStatus').textContent = '입장 취소 실패 · ' + error.message;
+    await refreshPersonDetailStatus();
+  }
 }
 
 function closePersonDetail() {
   const dialog = document.getElementById('personDetailDialog');
   if (typeof dialog.close === 'function') dialog.close();
   else dialog.removeAttribute('open');
+  detailPerson = null;
 }
 
 function getNameInitial(name) {

@@ -50,4 +50,30 @@ $$;
 
 revoke execute on function public.check_in(text) from public, anon, authenticated;
 grant execute on function public.check_in(text) to anon, authenticated;
+
+create or replace function public.cancel_check_in(p_bar_code text)
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_row public.checkins%rowtype;
+begin
+  update public.checkins
+    set status = 'pending', checked_in_at = null
+    where bar_code = btrim(p_bar_code) and status = 'checked_in'
+    returning * into v_row;
+
+  if found then
+    return jsonb_build_object('success', true, 'found', true, 'alreadyPending', false);
+  end if;
+
+  select * into v_row from public.checkins where bar_code = btrim(p_bar_code);
+  if not found then
+    return jsonb_build_object('success', true, 'found', false);
+  end if;
+  return jsonb_build_object('success', true, 'found', true, 'alreadyPending', true);
+end;
+$$;
+
+revoke execute on function public.cancel_check_in(text) from public, anon, authenticated;
+grant execute on function public.cancel_check_in(text) to anon, authenticated;
 commit;
