@@ -318,6 +318,8 @@
     #admissionRosterMessage { margin:10px 0 4px; text-align:center; }
     #admissionRosterCheckedInFilter { width:auto; margin:0 0 10px; padding:9px 12px; background:#d9ecff; color:#145a96; font-size:14px; font-weight:700; }
     #admissionRosterCheckedInFilter.active { background:#167c3a; color:#fff; }
+    .roster-status.checked-in { background:#d9f4df; color:#167c3a; }
+    .roster-status.pending { background:#f9d7e0; color:#b3265b; }
     #closeAdmissionRoster { width:auto; margin:0; background:#d9ecff; color:#145a96; }
     #returnFromAdmissionStatistics { width:100%; margin-top:16px; background:#d9ecff; color:#145a96; }
     .roster-scroll { max-height:70vh; overflow:auto; border:1px solid #ddd; border-radius:8px; }
@@ -326,7 +328,7 @@
     #admissionRosterTable th { position:sticky; top:0; z-index:1; background:#f5f1fa; white-space:nowrap; }
     #admissionRosterTable th:nth-child(1), #admissionRosterTable td:nth-child(1) { position:sticky; left:0; z-index:2; width:120px; min-width:120px; }
     #admissionRosterTable th:nth-child(1) { z-index:4; }
-    #admissionRosterTable th:nth-child(2), #admissionRosterTable td:nth-child(2) { position:sticky; left:120px; z-index:2; width:108px; min-width:108px; }
+    #admissionRosterTable th:nth-child(2), #admissionRosterTable td:nth-child(2) { position:sticky; left:120px; z-index:2; width:72px; min-width:72px; }
     #admissionRosterTable th:nth-child(2) { z-index:4; }
     #admissionRosterTable th:nth-child(1), #admissionRosterTable th:nth-child(2) { background:#f5f1fa; }
     .column-resizer { position:absolute; right:-3px; top:0; width:7px; height:100%; cursor:col-resize; touch-action:none; z-index:5; }
@@ -353,7 +355,7 @@
     }
     .roster-status { display:inline-block; padding:5px 8px; border-radius:999px; font-weight:700; white-space:nowrap; }
     .roster-status.checked-in { background:#d9f4df; color:#167c3a; }
-    .roster-status.pending { background:#ffe3e3; color:#b3261e; }
+    .roster-status.pending { background:#f9d7e0; color:#b3265b; }
     .roster-name-link { display:inline; width:auto; min-width:0; height:auto; margin:0; padding:0; border:0; border-radius:0; background:transparent; color:#1976d2; font-size:inherit; text-decoration:underline; cursor:pointer; }
     #personDetailDialog { width:min(92vw, 520px); max-height:85vh; border:0; border-radius:12px; padding:0; color:#222; box-shadow:0 10px 40px rgba(0,0,0,.25); }
     #personDetailDialog::backdrop { background:rgba(0,0,0,.45); }
@@ -414,11 +416,15 @@
       <h3 id="admissionRosterHeading">참가자 입장 조회</h3>
       <button id="closeAdmissionRoster" type="button" onclick="closeAdmissionRoster()">조회 화면 닫기</button>
     </div>
+    <p id="admissionRosterMessage" role="status">입장 명단을 불러오고 있습니다.</p>
+    <button id="admissionRosterCheckedInFilter" type="button" aria-pressed="false" onclick="toggleAdmissionCheckedInFilter()">입장한 사람들만 보기</button>
+    <nav id="admissionRosterFilters" aria-label="이름 초성 및 알파벳 링크"></nav>
     <div class="roster-scroll">
       <table id="admissionRosterTable">
         <colgroup>
           <col style="width:120px">
-          <col style="width:108px">
+          <col style="width:72px">
+          <col style="width:72px">
           <col style="width:90px">
           <col style="width:120px">
         </colgroup>
@@ -427,15 +433,13 @@
             <th scope="col">일련번호<span class="column-resizer"></span></th>
             <th scope="col">이름<span class="column-resizer"></span></th>
             <th scope="col">성별<span class="column-resizer"></span></th>
+            <th scope="col">입장상태<span class="column-resizer"></span></th>
             <th scope="col">전화번호<span class="column-resizer"></span></th>
           </tr>
         </thead>
         <tbody id="admissionRosterBody"></tbody>
       </table>
     </div>
-    <p id="admissionRosterMessage" role="status">입장 명단을 불러오고 있습니다.</p>
-    <button id="admissionRosterCheckedInFilter" type="button" aria-pressed="false" onclick="toggleAdmissionCheckedInFilter()">입장한 사람들만 보기</button>
-    <nav id="admissionRosterFilters" aria-label="이름 초성 및 알파벳 링크"></nav>
   </section>
 
   <dialog id="personDetailDialog" aria-labelledby="personDetailHeading">
@@ -2489,6 +2493,7 @@ function toggleAdmissionCheckedInFilter() {
   if (button) {
     button.classList.toggle('active', admissionRosterCheckedInOnly);
     button.setAttribute('aria-pressed', String(admissionRosterCheckedInOnly));
+    button.textContent = admissionRosterCheckedInOnly ? '전체보기' : '입장한 사람들만 보기';
   }
   refreshAdmissionRoster();
 }
@@ -2516,8 +2521,10 @@ async function refreshAdmissionRoster() {
     }
     body.replaceChildren();
     filteredPeople.forEach(person => {
+      const state = states.get(person.code);
+      const checkedIn = state.status === 'checked_in';
       const row = document.createElement('tr');
-      row.innerHTML = '<td></td><td></td><td></td><td></td>';
+      row.innerHTML = '<td></td><td></td><td></td><td></td><td></td>';
       row.cells[0].textContent = person.registrationId || '';
       const nameLink = document.createElement('button');
       nameLink.type = 'button';
@@ -2526,7 +2533,11 @@ async function refreshAdmissionRoster() {
       nameLink.addEventListener('click', () => showPersonDetail(person));
       row.cells[1].appendChild(nameLink);
       row.cells[2].textContent = person.gender || '';
-      row.cells[3].textContent = formatPhone(person.phone);
+      const status = document.createElement('span');
+      status.className = 'roster-status ' + (checkedIn ? 'checked-in' : 'pending');
+      status.textContent = checkedIn ? '입장' : '미입장';
+      row.cells[3].appendChild(status);
+      row.cells[4].textContent = formatPhone(person.phone);
       body.appendChild(row);
     });
     if (admissionRosterJumpRequested) {
@@ -2602,6 +2613,7 @@ function openAdmissionRoster(event) {
   if (checkedInFilterButton) {
     checkedInFilterButton.classList.remove('active');
     checkedInFilterButton.setAttribute('aria-pressed', 'false');
+    checkedInFilterButton.textContent = '입장한 사람들만 보기';
   }
   initializeRosterColumnResize();
   window.scrollTo({top:0});
