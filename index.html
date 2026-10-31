@@ -177,8 +177,8 @@
 
     #personCard {
       display: none;
-      margin-top: 18px;
-      padding: 22px;
+      margin-top: 12px;
+      padding: 16px;
       background: white;
       border-radius: 12px;
       text-align: left;
@@ -186,25 +186,30 @@
     }
 
     .name {
-      font-size: 28px;
+      font-size: 26px;
       font-weight: bold;
-      margin-bottom: 18px;
+      margin-bottom: 10px;
       color: #333;
     }
 
     .row {
-      padding: 10px 0;
+      display: grid;
+      grid-template-columns: 104px minmax(0, 1fr);
+      align-items: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 5px 0;
       border-bottom: 1px solid #eee;
     }
 
     .label {
-      font-size: 13px;
+      font-size: 12px;
       color: #777;
-      margin-bottom: 3px;
+      margin-bottom: 0;
     }
 
     .value {
-      font-size: 17px;
+      font-size: 16px;
       color: #222;
       word-break: break-word;
     }
@@ -215,8 +220,8 @@
     ================================================= */
 
     .checkin-status {
-      margin-top: 18px;
-      padding: 16px;
+      margin-top: 10px;
+      padding: 10px;
       border-radius: 9px;
       text-align: center;
       line-height: 1.7;
@@ -247,7 +252,7 @@
     button {
       width: 100%;
       padding: 15px;
-      margin-top: 16px;
+      margin-top: 10px;
       border: none;
       border-radius: 9px;
       font-size: 18px;
@@ -318,6 +323,17 @@
     .column-resizer { position:absolute; right:-3px; top:0; width:7px; height:100%; cursor:col-resize; touch-action:none; z-index:5; }
     #admissionRosterTable th { position:sticky; }
     #admissionRosterTable td { height:42px; max-height:42px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    @media (max-width: 600px) {
+      body { padding: 10px; }
+      .container { width:100%; max-width:none; }
+      #personCard { padding:12px; margin-top:8px; }
+      .name { font-size:23px; margin-bottom:6px; }
+      .row { grid-template-columns:92px minmax(0, 1fr); min-height:38px; gap:6px; }
+      .value { font-size:15px; }
+      .checkin-status { margin-top:7px; padding:7px 8px; line-height:1.45; }
+      #checkInButton, #scanAgainButton { margin-top:7px; padding:12px; }
+    }
+
     @media (orientation: landscape) {
       body { padding:10px; }
       .container { max-width:none; width:100%; }
@@ -350,7 +366,7 @@
     .person-detail-actions button:disabled { background:#d9ecff; color:#145a96; opacity:0.75; }
     #cancelPersonAdmission { background:#b3261e; }
     #personDetailStatus { font-weight:700; }
-    #databaseMessage { font-size:14px; white-space:pre-wrap; }
+    #databaseMessage { display:none !important; font-size:14px; white-space:pre-wrap; }
   </style>
 
 </head>
