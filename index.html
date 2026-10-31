@@ -285,6 +285,12 @@
       color: #145a96;
     }
 
+    #cancelCheckInButton {
+      background: #d93636;
+      color: white;
+      font-weight: bold;
+    }
+
     button:disabled {
       opacity: 0.75;
       cursor: default;
@@ -331,7 +337,7 @@
       .row { grid-template-columns:92px minmax(0, 1fr); min-height:38px; gap:6px; }
       .value { font-size:15px; }
       .checkin-status { margin-top:7px; padding:7px 8px; line-height:1.45; }
-      #checkInButton, #scanAgainButton { margin-top:7px; padding:12px; }
+      #checkInButton, #cancelCheckInButton, #scanAgainButton { margin-top:7px; padding:12px; }
     }
 
     @media (orientation: landscape) {
@@ -616,6 +622,14 @@
       onclick="confirmCheckIn()"
       style="display:none;">
       입장확인
+    </button>
+
+
+    <button
+      id="cancelCheckInButton"
+      onclick="confirmCancelCheckIn()"
+      style="display:none;">
+      입장취소
     </button>
 
 
@@ -1660,6 +1674,8 @@ function displayPerson(person) {
     button.style.display =
       "none";
 
+    document.getElementById("cancelCheckInButton").style.display = "block";
+
   }
 
 
@@ -1687,6 +1703,8 @@ function displayPerson(person) {
 
     button.textContent =
       "입장확인";
+
+    document.getElementById("cancelCheckInButton").style.display = "none";
 
   }
 
@@ -1835,6 +1853,34 @@ function confirmCheckIn() {
 
 }
 
+
+async function confirmCancelCheckIn() {
+  if (!currentQRCode || checkInPending) return;
+  if (!window.confirm("해당인의 입장 기록을 취소합니다. 계속하시겠습니까?")) return;
+
+  const button = document.getElementById("cancelCheckInButton");
+  const version = ++admissionViewVersion;
+  checkInPending = true;
+  button.disabled = true;
+  button.textContent = "입장 취소 중...";
+
+  try {
+    await admissionStore.cancelCheckIn(currentQRCode);
+    if (version !== admissionViewVersion) return;
+    localLookup(currentQRCode, function(data) {
+      if (data && data.success === true && data.found === true) displayPerson(data);
+    });
+    await refreshAdmissionRoster();
+  } catch (error) {
+    if (version === admissionViewVersion) {
+      alert("입장 기록 취소 중 오류가 발생했습니다. " + error.message);
+    }
+  } finally {
+    checkInPending = false;
+    button.disabled = false;
+    button.textContent = "입장취소";
+  }
+}
 
 /* =====================================================
    13. NEXT PERSON
@@ -2310,6 +2356,7 @@ async function processPersonAdmission() {
 
 async function cancelPersonAdmission() {
   if (!detailPerson || detailActionBusy) return;
+  if (!window.confirm("해당인의 입장 기록을 취소합니다. 계속하시겠습니까?")) return;
   detailActionBusy = true;
   document.getElementById('processPersonAdmission').disabled = true;
   document.getElementById('cancelPersonAdmission').disabled = true;
