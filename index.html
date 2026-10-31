@@ -315,15 +315,17 @@
     .roster-filter { width:auto; min-width:0; height:auto; margin:0; padding:0; border:0; border-radius:0; background:transparent; color:#1976d2; font-size:13px; font-weight:400; line-height:1.5; text-decoration:underline; }
     .roster-filter:hover, .roster-filter:focus-visible { color:#0d47a1; }
     .roster-filter.active { color:#0d47a1; font-weight:700; }
+    #admissionRosterCheckedInFilter { width:auto; margin:0 0 10px; padding:9px 12px; background:#d9ecff; color:#145a96; font-size:14px; font-weight:700; }
+    #admissionRosterCheckedInFilter.active { background:#167c3a; color:#fff; }
     #closeAdmissionRoster { width:auto; margin:0; background:#d9ecff; color:#145a96; }
     #returnFromAdmissionStatistics { width:100%; margin-top:16px; background:#d9ecff; color:#145a96; }
     .roster-scroll { max-height:70vh; overflow:auto; border:1px solid #ddd; border-radius:8px; }
     #admissionRosterTable { width:100%; min-width:600px; table-layout:fixed; border-collapse:separate; border-spacing:0; margin:0; background:white; }
     #admissionRosterTable th, #admissionRosterTable td { padding:10px 8px; border-bottom:1px solid #eee; border-right:1px solid #eee; text-align:left; background:white; overflow:hidden; }
     #admissionRosterTable th { position:sticky; top:0; z-index:1; background:#f5f1fa; white-space:nowrap; }
-    #admissionRosterTable th:nth-child(1), #admissionRosterTable td:nth-child(1) { position:sticky; left:0; z-index:2; width:64px; min-width:64px; }
+    #admissionRosterTable th:nth-child(1), #admissionRosterTable td:nth-child(1) { position:sticky; left:0; z-index:2; width:120px; min-width:120px; }
     #admissionRosterTable th:nth-child(1) { z-index:4; }
-    #admissionRosterTable th:nth-child(2), #admissionRosterTable td:nth-child(2) { position:sticky; left:64px; z-index:2; width:108px; min-width:108px; }
+    #admissionRosterTable th:nth-child(2), #admissionRosterTable td:nth-child(2) { position:sticky; left:120px; z-index:2; width:108px; min-width:108px; }
     #admissionRosterTable th:nth-child(2) { z-index:4; }
     #admissionRosterTable th:nth-child(1), #admissionRosterTable th:nth-child(2) { background:#f5f1fa; }
     .column-resizer { position:absolute; right:-3px; top:0; width:7px; height:100%; cursor:col-resize; touch-action:none; z-index:5; }
@@ -412,25 +414,22 @@
       <button id="closeAdmissionRoster" type="button" onclick="closeAdmissionRoster()">조회 화면 닫기</button>
     </div>
     <p id="admissionRosterMessage" role="status">입장 명단을 불러오고 있습니다.</p>
+    <button id="admissionRosterCheckedInFilter" type="button" aria-pressed="false" onclick="toggleAdmissionCheckedInFilter()">입장한 사람들만 보기</button>
     <nav id="admissionRosterFilters" aria-label="이름 초성 및 알파벳 링크"></nav>
     <div class="roster-scroll">
       <table id="admissionRosterTable">
         <colgroup>
-          <col style="width:64px">
+          <col style="width:120px">
           <col style="width:108px">
           <col style="width:90px">
           <col style="width:120px">
-          <col style="width:150px">
-          <col style="width:auto">
         </colgroup>
         <thead>
           <tr>
-            <th scope="col">순번<span class="column-resizer"></span></th>
+            <th scope="col">일련번호<span class="column-resizer"></span></th>
             <th scope="col">이름<span class="column-resizer"></span></th>
-            <th scope="col">입장상태<span class="column-resizer"></span></th>
+            <th scope="col">성별<span class="column-resizer"></span></th>
             <th scope="col">전화번호<span class="column-resizer"></span></th>
-            <th scope="col">이메일<span class="column-resizer"></span></th>
-            <th scope="col">바코드 일련번호<span class="column-resizer"></span></th>
           </tr>
         </thead>
         <tbody id="admissionRosterBody"></tbody>
@@ -2346,6 +2345,7 @@ function returnToSearchFromStatistics() {
 
 let admissionRosterBusy = false;
 let admissionRosterFilter = 'ALL';
+let admissionRosterCheckedInOnly = false;
 let admissionRosterJumpRequested = false;
 
 const koreanInitials = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
@@ -2481,6 +2481,17 @@ function renderAdmissionRosterFilters(sortedPeople) {
   });
 }
 
+function toggleAdmissionCheckedInFilter() {
+  admissionRosterCheckedInOnly = !admissionRosterCheckedInOnly;
+  admissionRosterJumpRequested = true;
+  const button = document.getElementById('admissionRosterCheckedInFilter');
+  if (button) {
+    button.classList.toggle('active', admissionRosterCheckedInOnly);
+    button.setAttribute('aria-pressed', String(admissionRosterCheckedInOnly));
+  }
+  refreshAdmissionRoster();
+}
+
 async function refreshAdmissionRoster() {
   const panel = document.getElementById('admissionRoster');
   if (panel.hidden || document.hidden || admissionRosterBusy) return;
@@ -2495,39 +2506,36 @@ async function refreshAdmissionRoster() {
       a.code.localeCompare(b.code, 'ko', {numeric:true})
     );
     renderAdmissionRosterFilters(sortedPeople);
-    const filteredPeople = admissionRosterFilter === 'ALL'
+    let filteredPeople = admissionRosterFilter === 'ALL'
       ? sortedPeople
       : sortedPeople.filter(person => getNameInitial(person.name) === admissionRosterFilter);
     const states = await admissionStore.getStates(filteredPeople.map(person => person.code));
+    if (admissionRosterCheckedInOnly) {
+      filteredPeople = filteredPeople.filter(person => states.get(person.code).status === 'checked_in');
+    }
     body.replaceChildren();
-    filteredPeople.forEach((person, index) => {
-      const state = states.get(person.code);
-      const checkedIn = state.status === 'checked_in';
+    filteredPeople.forEach(person => {
       const row = document.createElement('tr');
-      row.innerHTML = '<td></td><td></td><td></td><td></td><td></td><td></td>';
-      row.cells[0].textContent = String(index + 1);
+      row.innerHTML = '<td></td><td></td><td></td><td></td>';
+      row.cells[0].textContent = person.registrationId || '';
       const nameLink = document.createElement('button');
       nameLink.type = 'button';
       nameLink.className = 'roster-name-link';
       nameLink.textContent = person.name;
       nameLink.addEventListener('click', () => showPersonDetail(person));
       row.cells[1].appendChild(nameLink);
-      const status = document.createElement('span');
-      status.className = 'roster-status ' + (checkedIn ? 'checked-in' : 'pending');
-      status.textContent = checkedIn ? '입장' : '미입장';
-      row.cells[2].appendChild(status);
+      row.cells[2].textContent = person.gender || '';
       row.cells[3].textContent = formatPhone(person.phone);
-      row.cells[4].textContent = person.email;
-      row.cells[5].textContent = person.code;
       body.appendChild(row);
     });
     if (admissionRosterJumpRequested) {
       admissionRosterJumpRequested = false;
       document.querySelector('.roster-scroll').scrollTop = 0;
     }
+    const filterLabel = admissionRosterCheckedInOnly ? '입장한 사람 ' : '';
     message.textContent = admissionRosterFilter === 'ALL'
-      ? `총 ${sortedPeople.length}명 · 가나다순 · 5초마다 자동 갱신`
-      : `${admissionRosterFilter} ${filteredPeople.length}명 · 전체 ${sortedPeople.length}명 · 5초마다 자동 갱신`;
+      ? `${filterLabel}총 ${filteredPeople.length}명 · 전체 ${sortedPeople.length}명 · 가나다순 · 5초마다 자동 갱신`
+      : `${filterLabel}${admissionRosterFilter} ${filteredPeople.length}명 · 전체 ${sortedPeople.length}명 · 5초마다 자동 갱신`;
   } catch (error) {
     message.textContent = '입장 명단을 불러오지 못했습니다. · ' + error.message;
   } finally {
@@ -2550,7 +2558,7 @@ function initializeRosterColumnResize() {
       const startX = event.clientX;
       const startWidth = parseFloat(columns[index].style.width) ||
         columns[index].getBoundingClientRect().width || header.getBoundingClientRect().width;
-      const minimum = index === 0 ? 48 : index === 1 ? 48 : 70;
+      const minimum = index === 0 ? 70 : index === 1 ? 48 : 70;
       const onMove = moveEvent => {
         const width = Math.max(minimum, Math.min(300, startWidth + moveEvent.clientX - startX));
         columns[index].style.width = `${Math.round(width)}px`;
@@ -2560,7 +2568,7 @@ function initializeRosterColumnResize() {
         });
         if (index === 0 || index === 1) {
           const firstWidth = parseFloat(columns[0].style.width) ||
-            columns[0].getBoundingClientRect().width || 64;
+            columns[0].getBoundingClientRect().width || 120;
           table.querySelectorAll('th:nth-child(2), td:nth-child(2)').forEach(cell => {
             cell.style.left = `${firstWidth}px`;
           });
@@ -2587,7 +2595,13 @@ function openAdmissionRoster(event) {
   hiddenIds.forEach(id => { const element = document.getElementById(id); if (element) { element.hidden = true; element.style.display = 'none'; } });
   setSearchAndScannerVisible(false);
   admissionRosterFilter = 'ALL';
+  admissionRosterCheckedInOnly = false;
   admissionRosterJumpRequested = false;
+  const checkedInFilterButton = document.getElementById('admissionRosterCheckedInFilter');
+  if (checkedInFilterButton) {
+    checkedInFilterButton.classList.remove('active');
+    checkedInFilterButton.setAttribute('aria-pressed', 'false');
+  }
   initializeRosterColumnResize();
   window.scrollTo({top:0});
   refreshAdmissionRoster();
