@@ -432,8 +432,8 @@
           <tr>
             <th scope="col">일련번호<span class="column-resizer"></span></th>
             <th scope="col">이름<span class="column-resizer"></span></th>
-            <th scope="col">성별<span class="column-resizer"></span></th>
             <th scope="col">입장상태<span class="column-resizer"></span></th>
+            <th scope="col">성별<span class="column-resizer"></span></th>
             <th scope="col">전화번호<span class="column-resizer"></span></th>
           </tr>
         </thead>
@@ -2532,11 +2532,11 @@ async function refreshAdmissionRoster() {
       nameLink.textContent = person.name;
       nameLink.addEventListener('click', () => showPersonDetail(person));
       row.cells[1].appendChild(nameLink);
-      row.cells[2].textContent = person.gender || '';
       const status = document.createElement('span');
       status.className = 'roster-status ' + (checkedIn ? 'checked-in' : 'pending');
       status.textContent = checkedIn ? '입장' : '미입장';
-      row.cells[3].appendChild(status);
+      row.cells[2].appendChild(status);
+      row.cells[3].textContent = person.gender || '';
       row.cells[4].textContent = formatPhone(person.phone);
       body.appendChild(row);
     });
