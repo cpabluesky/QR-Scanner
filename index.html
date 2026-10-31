@@ -652,6 +652,8 @@
 
 let currentQRCode = "";
 
+let currentPersonAlreadyCheckedIn = false;
+
 let scannerRunning = false;
 
 let processing = false;
@@ -1583,6 +1585,7 @@ function selectSearchResult(person) {
 function displayPerson(person) {
 
   closeAdmissionStatistics();
+  currentPersonAlreadyCheckedIn = person.alreadyCheckedIn === true;
   document.getElementById('personRegistrationId').textContent =
     person.registrationId || '';
 
@@ -1844,8 +1847,10 @@ function confirmCheckIn() {
       }
 
 
+      currentPersonAlreadyCheckedIn = true;
       button.style.display =
         "none";
+      document.getElementById("cancelCheckInButton").style.display = "block";
 
     }
 
@@ -1886,45 +1891,54 @@ async function confirmCancelCheckIn() {
    13. NEXT PERSON
 ===================================================== */
 
-function nextPerson() {
+async function nextPerson() {
+  if (checkInPending) return;
 
-  currentQRCode =
-    "";
+  const code = currentQRCode;
+  const proceedWithoutCheckIn = async () => {
+    currentQRCode = "";
+    currentPersonAlreadyCheckedIn = false;
+    processing = false;
 
+    document.getElementById("personCard").style.display = "none";
 
-  processing =
-    false;
+    if (currentMode === "search") {
+      openNameSearch();
+      return;
+    }
 
+    restartScanner();
+  };
 
-  document.getElementById(
-    "personCard"
-  ).style.display =
-    "none";
+  if (code && !currentPersonAlreadyCheckedIn) {
+    if (window.confirm("입장처리가 완료되지 않았습니다. 입장처리 하시겠습니까?")) {
+      checkInPending = true;
+      const button = document.getElementById("scanAgainButton");
+      button.disabled = true;
+      button.textContent = "입장 처리 중...";
 
-
-  /*
-     이름 검색으로 사람을 찾았다면
-     다시 이름 검색 화면으로 이동
-  */
-
-  if (
-    currentMode === "search"
-  ) {
-
-    openNameSearch();
-
-    return;
-
+      try {
+        const result = await admissionStore.checkIn(code);
+        if (!result || result.found !== true || result.success !== true) {
+          throw new Error("입장 처리 대상을 찾을 수 없습니다.");
+        }
+        currentPersonAlreadyCheckedIn = true;
+        await refreshAdmissionRoster();
+      } catch (error) {
+        alert("입장 처리 중 오류가 발생했습니다. " + error.message);
+        button.disabled = false;
+        button.textContent = "다음 사람";
+        checkInPending = false;
+        return;
+      } finally {
+        checkInPending = false;
+        button.disabled = false;
+        button.textContent = "다음 사람";
+      }
+    }
   }
 
-
-  /*
-     QR 스캔으로 찾았다면
-     바로 카메라 재시작
-  */
-
-  restartScanner();
-
+  await proceedWithoutCheckIn();
 }
 
 
