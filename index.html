@@ -371,6 +371,16 @@
     #cancelPersonAdmission { background:#b3261e; color:#fff; }
     .person-detail-actions button:disabled { background:#d9ecff; color:#145a96; opacity:0.75; }
     #cancelPersonAdmission { background:#b3261e; }
+    #confirmationDialog { width:min(90vw, 440px); border:0; border-radius:14px; padding:0; box-shadow:0 12px 44px rgba(0,0,0,.35); color:#222; }
+    #confirmationDialog::backdrop { background:rgba(0,0,0,.55); }
+    .confirmation-content { padding:24px 20px 20px; text-align:center; }
+    #confirmationTitle { margin:0 0 10px; font-size:21px; }
+    #confirmationMessage { margin:0; min-height:48px; font-size:17px; line-height:1.55; white-space:pre-line; }
+    .confirmation-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:18px; }
+    .confirmation-actions button { width:100%; margin:0; }
+    #confirmationYes { background:#167c3a; color:#fff; font-weight:700; }
+    #confirmationNo { background:#d93636; color:#fff; font-weight:700; }
+    @media (max-width:600px) { #confirmationDialog { width:calc(100vw - 32px); } .confirmation-content { padding:22px 16px 16px; } }
     #personDetailStatus { font-weight:700; }
     #databaseMessage { display:none !important; font-size:14px; white-space:pre-wrap; }
   </style>
@@ -449,6 +459,16 @@
     </div>
   </dialog>
 
+  <dialog id="confirmationDialog" aria-labelledby="confirmationTitle" aria-describedby="confirmationMessage">
+    <div class="confirmation-content">
+      <h3 id="confirmationTitle">확인</h3>
+      <p id="confirmationMessage"></p>
+      <div class="confirmation-actions">
+        <button id="confirmationYes" type="button" onclick="resolveConfirmation(true)">예</button>
+        <button id="confirmationNo" type="button" onclick="resolveConfirmation(false)">아니오</button>
+      </div>
+    </div>
+  </dialog>
 
   <!-- =================================================
        INITIAL SCREEN
@@ -1859,9 +1879,34 @@ function confirmCheckIn() {
 }
 
 
+let confirmationResolver = null;
+
+function resolveConfirmation(result) {
+  const dialog = document.getElementById("confirmationDialog");
+  const resolver = confirmationResolver;
+  confirmationResolver = null;
+  if (typeof dialog.close === "function" && dialog.open) dialog.close();
+  else dialog.removeAttribute("open");
+  if (resolver) resolver(result);
+}
+
+function showConfirmation(message, options) {
+  return new Promise((resolve) => {
+    const dialog = document.getElementById("confirmationDialog");
+    document.getElementById("confirmationTitle").textContent = options?.title || "확인";
+    document.getElementById("confirmationMessage").textContent = message;
+    confirmationResolver = resolve;
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+  });
+}
+
 async function confirmCancelCheckIn() {
   if (!currentQRCode || checkInPending) return;
-  if (!window.confirm("해당인의 입장 기록을 취소합니다. 계속하시겠습니까?")) return;
+  const confirmed = await showConfirmation("해당인의 입장 기록을 취소합니다. 계속하시겠습니까?", {
+    title: "입장 취소 확인"
+  });
+  if (!confirmed) return;
 
   const button = document.getElementById("cancelCheckInButton");
   const version = ++admissionViewVersion;
@@ -1911,7 +1956,10 @@ async function nextPerson() {
   };
 
   if (code && !currentPersonAlreadyCheckedIn) {
-    if (window.confirm("입장처리가 완료되지 않았습니다. 입장처리 하시겠습니까?")) {
+    const shouldCheckIn = await showConfirmation("입장처리가 완료되지 않았습니다. 입장처리 하시겠습니까?", {
+      title: "입장 처리 확인"
+    });
+    if (shouldCheckIn) {
       checkInPending = true;
       const button = document.getElementById("scanAgainButton");
       button.disabled = true;
@@ -2370,7 +2418,10 @@ async function processPersonAdmission() {
 
 async function cancelPersonAdmission() {
   if (!detailPerson || detailActionBusy) return;
-  if (!window.confirm("해당인의 입장 기록을 취소합니다. 계속하시겠습니까?")) return;
+  const confirmed = await showConfirmation("해당인의 입장 기록을 취소합니다. 계속하시겠습니까?", {
+    title: "입장 취소 확인"
+  });
+  if (!confirmed) return;
   detailActionBusy = true;
   document.getElementById('processPersonAdmission').disabled = true;
   document.getElementById('cancelPersonAdmission').disabled = true;
@@ -2771,6 +2822,13 @@ function initializeAdmissions() {
   for (const id of ['cameraStartButton', 'nameSearchButton', 'scannerNameSearchButton']) {
     document.getElementById(id).disabled = !admissionsConfigured;
   }
+}
+const confirmationDialog = document.getElementById('confirmationDialog');
+if (confirmationDialog) {
+  confirmationDialog.addEventListener('cancel', function(event) {
+    event.preventDefault();
+    resolveConfirmation(false);
+  });
 }
 loadRegistrations();
 initializeAdmissions();
