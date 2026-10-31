@@ -315,6 +315,7 @@
     .roster-filter { width:auto; min-width:0; height:auto; margin:0; padding:0; border:0; border-radius:0; background:transparent; color:#1976d2; font-size:13px; font-weight:400; line-height:1.5; text-decoration:underline; }
     .roster-filter:hover, .roster-filter:focus-visible { color:#0d47a1; }
     .roster-filter.active { color:#0d47a1; font-weight:700; }
+    #admissionRosterMessage { margin:10px 0 4px; text-align:center; }
     #admissionRosterCheckedInFilter { width:auto; margin:0 0 10px; padding:9px 12px; background:#d9ecff; color:#145a96; font-size:14px; font-weight:700; }
     #admissionRosterCheckedInFilter.active { background:#167c3a; color:#fff; }
     #closeAdmissionRoster { width:auto; margin:0; background:#d9ecff; color:#145a96; }
@@ -413,9 +414,6 @@
       <h3 id="admissionRosterHeading">참가자 입장 조회</h3>
       <button id="closeAdmissionRoster" type="button" onclick="closeAdmissionRoster()">조회 화면 닫기</button>
     </div>
-    <p id="admissionRosterMessage" role="status">입장 명단을 불러오고 있습니다.</p>
-    <button id="admissionRosterCheckedInFilter" type="button" aria-pressed="false" onclick="toggleAdmissionCheckedInFilter()">입장한 사람들만 보기</button>
-    <nav id="admissionRosterFilters" aria-label="이름 초성 및 알파벳 링크"></nav>
     <div class="roster-scroll">
       <table id="admissionRosterTable">
         <colgroup>
@@ -435,6 +433,9 @@
         <tbody id="admissionRosterBody"></tbody>
       </table>
     </div>
+    <p id="admissionRosterMessage" role="status">입장 명단을 불러오고 있습니다.</p>
+    <button id="admissionRosterCheckedInFilter" type="button" aria-pressed="false" onclick="toggleAdmissionCheckedInFilter()">입장한 사람들만 보기</button>
+    <nav id="admissionRosterFilters" aria-label="이름 초성 및 알파벳 링크"></nav>
   </section>
 
   <dialog id="personDetailDialog" aria-labelledby="personDetailHeading">
